@@ -1,0 +1,31 @@
+{
+  "name": "@tmusic/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsup src/server.ts --format esm --dts --clean",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@fastify/sensible": "^6.0.3",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@tmusic/contracts": "*",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.1",
+    "ioredis": "^5.8.1",
+    "mongoose": "^9.0.0",
+    "nanoid": "^5.1.6",
+    "socket.io": "^4.8.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "tsx": "^4.20.6",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
+  }
+}

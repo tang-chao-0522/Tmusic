@@ -1,0 +1,42 @@
+services:
+  netease-api:
+    build:
+      context: ./infra/netease-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      no_proxy: "*"
+      NO_PROXY: "*"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login/status"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - tmusic_mongo:/data/db
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - tmusic_redis:/data
+
+volumes:
+  tmusic_mongo:
+  tmusic_redis:

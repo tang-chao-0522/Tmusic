@@ -1,0 +1,29 @@
+{
+  "name": "tmusic",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "packages/*"
+  ],
+  "scripts": {
+    "predev": "npm run build -w @tmusic/contracts",
+    "dev": "concurrently -n netease,api,web -c yellow,cyan,magenta \"npm run dev:netease\" \"npm run dev -w @tmusic/api\" \"npm run dev -w @tmusic/web\"",
+    "dev:app": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @tmusic/api\" \"npm run dev -w @tmusic/web\"",
+    "dev:web": "npm run dev -w @tmusic/web",
+    "dev:api": "npm run dev -w @tmusic/api",
+    "dev:netease": "npx --yes NeteaseCloudMusicApi@4.32.0",
+    "build": "npm run build -w @tmusic/contracts && npm run build -w @tmusic/api && npm run build -w @tmusic/web",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "test": "npm run test -ws --if-present",
+    "lint": "npm run lint -ws --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
