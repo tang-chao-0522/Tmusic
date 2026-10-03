@@ -2,7 +2,8 @@ import { Heart, MessageCircle, Send, X } from 'lucide-react'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { DemoTrack } from '../../data/tracks'
-import { getNeteaseComments, getTmusicComments, postTmusicComment } from '../../lib/api'
+import { postTmusicComment } from '../../lib/api'
+import { queries, queryKeys } from '../../lib/queries'
 
 const tmusicComments = [
   { id: '1', user: '晚风邮差', text: '前奏响起的时候，像重新走过了一遍那条回家的路。', time: '12 分钟前', likes: 18 },
@@ -23,13 +24,10 @@ export function CommentsDrawer({ track, onClose }: { track: DemoTrack | null; on
 
 function CommentsDrawerContent({ track, source, setSource, draft, setDraft, onClose }: { track: DemoTrack; source: 'tmusic' | 'netease'; setSource: (value: 'tmusic' | 'netease') => void; draft: string; setDraft: (value: string) => void; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const query = useQuery({
-    queryKey: ['comments', source, track.provider, track.sourceId],
-    queryFn: () => source === 'tmusic' ? getTmusicComments(track.provider, track.sourceId) : getNeteaseComments(track.provider, track.sourceId),
-  })
+  const query = useQuery(queries.comments(source, track.provider, track.sourceId))
   const mutation = useMutation({
     mutationFn: (content: string) => postTmusicComment(track.provider, track.sourceId, content),
-    onSuccess: () => { setDraft(''); void queryClient.invalidateQueries({ queryKey: ['comments', 'tmusic', track.provider, track.sourceId] }) },
+    onSuccess: () => { setDraft(''); void queryClient.invalidateQueries({ queryKey: queryKeys.comments('tmusic', track.provider, track.sourceId) }) },
   })
   const fallback = source === 'tmusic' ? tmusicComments : neteaseComments
   const comments = query.data?.length ? query.data : fallback

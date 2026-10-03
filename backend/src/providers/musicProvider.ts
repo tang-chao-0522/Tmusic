@@ -21,5 +21,6 @@ export type ExternalComment = {
 
 export interface MusicProvider {
   resolvePlayback(sourceId: string, quality: string, context: ProviderContext): Promise<PlaybackGrant>
+  getLyrics(sourceId: string): Promise<{ original: string; translation: string }>
   getComments(kind: 'track' | 'playlist', sourceId: string, cursor?: string): Promise<{ items: ExternalComment[]; nextCursor: string | null; hasMore: boolean; fetchedAt: string }>
 }

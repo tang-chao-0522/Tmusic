@@ -1,17 +1,15 @@
 import { Outlet } from 'react-router-dom'
 import { AiOrb } from '../shared/AiOrb'
 import { PlayerDock } from '../player/PlayerDock'
+import { PlaybackQueueDrawer } from '../player/PlaybackQueueDrawer'
 import { Sidebar } from './Sidebar'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { getCatalogHome } from '../../lib/api'
+import { queries } from '../../lib/queries'
 import { usePlayerStore } from '../../stores/playerStore'
 
 export function AppShell() {
-  const { data } = useQuery({
-    queryKey: ['catalog-home'], queryFn: getCatalogHome,
-    refetchInterval: (query) => query.state.data?.degraded ? 10_000 : false,
-  })
+  const { data } = useQuery(queries.catalogHome())
   const loadCatalogTracks = usePlayerStore((state) => state.loadCatalogTracks)
   useEffect(() => {
     if (data && !data.degraded) loadCatalogTracks(data.recommendations)
@@ -24,6 +22,7 @@ export function AppShell() {
       </main>
       <AiOrb />
       <PlayerDock />
+      <PlaybackQueueDrawer />
     </div>
   )
 }

@@ -1,13 +1,12 @@
-import { env } from '../config/env'
 import { isMongoReady } from '../infra/mongo'
 import { ExternalCredentialModel } from '../models/ExternalCredential'
 import { decryptCredential } from '../security/credentialCipher'
 import { encryptCredential } from '../security/credentialCipher'
 
 export async function getNeteaseCookie(userId: string) {
-  if (!isMongoReady()) return env.NETEASE_COOKIE
+  if (!isMongoReady()) return undefined
   const credential = await ExternalCredentialModel.findOne({ userId, provider: 'netease' }).lean()
-  if (!credential) return env.NETEASE_COOKIE
+  if (!credential) return undefined
   try {
     return decryptCredential({ ciphertext: credential.ciphertext, iv: credential.iv, authTag: credential.authTag })
   } catch {
@@ -31,6 +30,6 @@ export async function removeNeteaseCookie(userId: string) {
 }
 
 export async function hasNeteaseCredential(userId: string) {
-  if (!isMongoReady()) return Boolean(env.NETEASE_COOKIE)
-  return Boolean(await ExternalCredentialModel.exists({ userId, provider: 'netease' })) || Boolean(env.NETEASE_COOKIE)
+  if (!isMongoReady()) return false
+  return Boolean(await ExternalCredentialModel.exists({ userId, provider: 'netease' }))
 }

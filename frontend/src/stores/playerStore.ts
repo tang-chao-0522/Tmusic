@@ -12,7 +12,11 @@ type PlayerState = {
   volume: number
   shuffle: boolean
   repeatMode: RepeatMode
+  queueOpen: boolean
+  openQueue: () => void
+  closeQueue: () => void
   play: (track?: DemoTrack) => void
+  playQueue: (tracks: DemoTrack[], startIndex?: number, shuffle?: boolean) => void
   pause: () => void
   toggle: () => void
   next: () => void
@@ -34,6 +38,9 @@ export const usePlayerStore = create<PlayerState>()(
       volume: 0.72,
       shuffle: false,
       repeatMode: 'all',
+      queueOpen: false,
+      openQueue: () => set({ queueOpen: true }),
+      closeQueue: () => set({ queueOpen: false }),
       play: (track) =>
         set((state) => ({
           queue: track && !state.queue.some((item) => item.id === track.id) ? [track, ...state.queue] : state.queue,
@@ -41,6 +48,18 @@ export const usePlayerStore = create<PlayerState>()(
           progressMs: track && track.id !== state.currentId ? 0 : state.progressMs,
           isPlaying: true,
         })),
+      playQueue: (tracks, startIndex = 0, shuffle = false) => {
+        const selected = tracks[startIndex]
+        if (!selected) return
+        const remaining = [...tracks.slice(startIndex + 1), ...tracks.slice(0, startIndex)]
+        if (shuffle) {
+          for (let index = remaining.length - 1; index > 0; index--) {
+            const randomIndex = Math.floor(Math.random() * (index + 1))
+            ;[remaining[index], remaining[randomIndex]] = [remaining[randomIndex]!, remaining[index]!]
+          }
+        }
+        set({ queue: [selected, ...remaining], currentId: selected.id, progressMs: 0, isPlaying: true, shuffle })
+      },
       pause: () => set({ isPlaying: false }),
       toggle: () => set((state) => ({ isPlaying: !state.isPlaying })),
       next: () => {

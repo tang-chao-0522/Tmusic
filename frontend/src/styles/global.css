@@ -23,6 +23,8 @@
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--bg); }
 body { margin: 0; min-width: 320px; min-height: 100vh; overflow-x: hidden; }
+html,body,.ai-chat-scroll{scrollbar-width:none;-ms-overflow-style:none}
+html::-webkit-scrollbar,body::-webkit-scrollbar,.ai-chat-scroll::-webkit-scrollbar{display:none}
 button, input, textarea { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
@@ -83,8 +85,12 @@ button { border: 0; }
 .hero-quote { position: absolute; z-index: 2; right: 6%; top: 132px; margin: 0; color: #fff4fb; font-family: Georgia, "STKaiti", serif; font-size: 20px; line-height: 1.75; letter-spacing: .12em; transform: rotate(-5deg); text-shadow: 0 4px 18px rgba(22,13,27,.5); }
 .library-glass { position: relative; margin-top: -1px; min-height: 430px; padding: 0 42px 30px; background: linear-gradient(180deg, rgba(45,48,75,.93), rgba(24,28,50,.97)); }
 .filter-row { min-height: 68px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line-soft); }
-.mood-tabs { display: flex; align-self: stretch; gap: clamp(14px, 3vw, 46px); overflow-x: auto; }
-.mood-tabs button { position: relative; min-width: max-content; color: #aaaabc; background: transparent; cursor: pointer; }
+.favorites-source-row { gap: 16px; color: #c9c1d1; font-size: 13px; }
+.favorites-source-row button { display: inline-flex; align-items: center; gap: 7px; color: #f1e8f4; background: transparent; cursor: pointer; }
+.favorites-source-row button:disabled { opacity: .5; cursor: wait; }
+.favorites-page .empty-state a, .favorites-page .empty-state button { margin-left: 10px; color: #ffc0df; background: transparent; text-decoration: underline; cursor: pointer; }
+.mood-tabs { display: flex; flex-wrap: wrap; align-self: stretch; min-width: 0; column-gap: clamp(14px, 2vw, 30px); overflow: visible; }
+.mood-tabs button { position: relative; min-width: max-content; min-height: 58px; color: #aaaabc; background: transparent; cursor: pointer; }
 .mood-tabs button.active { color: white; }
 .mood-tabs button.active::after { content: ""; position: absolute; inset: auto 0 -1px; height: 2px; background: var(--pink); box-shadow: 0 0 10px var(--pink); }
 .sort-button { min-width: 148px; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; background: rgba(255,255,255,.035); color: #bebccc; cursor: pointer; }

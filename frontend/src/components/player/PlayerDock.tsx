@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { formatDuration } from '../../data/tracks'
 import { usePlayerStore } from '../../stores/playerStore'
 import { TrackArtwork } from './TrackArtwork'
-import { resolvePlayback } from '../../lib/api'
+import { appQueryClient } from '../../lib/queryClient'
+import { getCachedPlaybackGrant } from '../../lib/queries'
 
 export function PlayerDock() {
   const state = usePlayerStore()
@@ -30,11 +31,16 @@ export function PlayerDock() {
 
   useEffect(() => {
     const audio = audioRef.current
+    if (audio?.readyState && Math.abs(audio.currentTime * 1000 - state.progressMs) > 1200) audio.currentTime = state.progressMs / 1000
+  }, [state.progressMs])
+
+  useEffect(() => {
+    const audio = audioRef.current
     if (!audio || !track) return
     if (!state.isPlaying) { audio.pause(); return }
     let cancelled = false
     setPlaybackError('')
-    void resolvePlayback(track)
+    void getCachedPlaybackGrant(appQueryClient, track)
       .then((grant) => {
         if (cancelled) return
         if (audio.src !== grant.url) {
@@ -108,7 +114,7 @@ export function PlayerDock() {
           style={{ '--range-progress': `${state.volume * 100}%` } as React.CSSProperties}
           aria-label="音量"
         />
-        <button className="bare-button desktop-only" type="button" aria-label="播放队列"><ListMusic size={20} /></button>
+        <button className="bare-button" type="button" onClick={state.openQueue} aria-label="播放队列"><ListMusic size={20} /></button>
         <button className="bare-button desktop-only" type="button" onClick={() => navigate('/player')} aria-label="全屏"><Maximize2 size={19} /></button>
       </div>
     </section>

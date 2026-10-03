@@ -1,20 +1,29 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, MoreHorizontal, Play, Plus } from 'lucide-react'
+import { MoreHorizontal, Play, Plus, RefreshCw } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { PageTopbar } from '../components/layout/PageTopbar'
-import { TrackArtwork } from '../components/player/TrackArtwork'
-import { demoTracks } from '../data/tracks'
-import { getCatalogHome } from '../lib/api'
+import { TrackListItem } from '../components/music/TrackListItem'
+import { GlassPanel } from '../components/shared/GlassPanel'
+import { SectionHeading } from '../components/shared/SectionHeading'
+import { Button } from '../components/ui/button'
+import { demoTracks, type DemoTrack } from '../data/tracks'
+import { queries } from '../lib/queries'
 import { usePlayerStore } from '../stores/playerStore'
 
 export function DiscoverPage() {
   const play = usePlayerStore((state) => state.play)
-  const { data, isError, refetch } = useQuery({
-    queryKey: ['catalog-home'], queryFn: getCatalogHome,
-    refetchInterval: (query) => query.state.data?.degraded ? 10_000 : false,
-  })
+  const { data, isError, refetch } = useQuery(queries.catalogHome())
   const hero = data?.hero ?? demoTracks[0]!
-  const recent = data?.continueListening ?? demoTracks.slice(0, 2)
-  const picks = data?.quickPicks ?? demoTracks.slice(2, 6)
+  const recommendations = data?.recommendations ?? demoTracks
+  const suggestions = useMemo(() => data?.guessYouLike ?? demoTracks.slice(0, 2), [data?.guessYouLike])
+  const randomPool = useMemo(() => recommendations.filter((track) => !suggestions.some((item) => item.id === track.id)), [recommendations, suggestions])
+  const [randomPicks, setRandomPicks] = useState<DemoTrack[]>([])
+
+  useEffect(() => {
+    setRandomPicks(sampleTracks(randomPool))
+  }, [randomPool])
+
+  const picks = randomPicks.length ? randomPicks : randomPool.slice(0, 3)
 
   return (
     <div className="immersive-page home-page page-with-player">
@@ -23,29 +32,38 @@ export function DiscoverPage() {
         <span className="eyebrow">FEATURED TODAY</span><h1>{hero.name}</h1><h2>{hero.artists[0]?.name}</h2>
         <p>「那些曾听见的声音，<br />仍在某处轻轻回响。」</p>
         <div className="hero-actions">
-          <button className="primary-pill" type="button" onClick={() => play(hero)}><Play size={17} fill="currentColor" />播放</button>
-          <button className="secondary-pill" type="button"><Plus size={18} />收藏到音乐库</button>
+          <Button className="primary-pill" variant="aurora" size="lg" type="button" onClick={() => play(hero)}><Play size={17} fill="currentColor" />播放</Button>
+          <Button className="secondary-pill" variant="glass" size="lg" type="button"><Plus size={18} />收藏到音乐库</Button>
           <button className="round-more" type="button" aria-label="更多"><MoreHorizontal /></button>
         </div>
       </section>
       <p className="home-poem">声音会带我们<br />再一次，抵达那片天空。</p>
-      <section className="home-hub glass-panel">
+      <GlassPanel as="section" className="home-hub">
         <div className="hub-column">
-          <header><h3>继续聆听</h3><ArrowRight size={18} /></header>
-          {recent.map((track, index) => <button className="continue-row" key={track.id} type="button" onClick={() => play(track)}>
-            <TrackArtwork palette={track.palette} coverUrl={track.coverUrl} /><span><strong>{track.name}</strong><small>{track.artists[0]?.name}</small></span>
-            <i><b style={{ width: `${index ? 31 : 56}%` }} /></i><em>{index ? '1:12' : '2:34'} / {index ? '4:18' : '5:21'}</em>
-          </button>)}
+          <SectionHeading title="猜你喜欢" />
+          {suggestions.map((track) => <TrackListItem key={track.id} track={track} variant="recommend" onPlay={() => play(track)} />)}
         </div>
         <div className="hub-column quick-column">
-          <header><h3>随心挑选</h3><ArrowRight size={18} /></header>
-          {picks.slice(0, 3).map((track) => <button className="quick-row" key={track.id} type="button" onClick={() => play(track)}>
-            <TrackArtwork palette={track.palette} coverUrl={track.coverUrl} /><span><strong>{track.name}</strong><small>{track.artists[0]?.name}</small></span>
-            <i><Play size={15} /></i><MoreHorizontal size={18} />
-          </button>)}
+          <SectionHeading title="随心挑选" action={<button className="hub-refresh" type="button" onClick={() => setRandomPicks((current) => sampleTracks(randomPool, current))} aria-label="刷新随心挑选" title="换一批"><RefreshCw size={18} /></button>} />
+          {picks.map((track) => <TrackListItem key={track.id} track={track} variant="quick" onPlay={() => play(track)} />)}
         </div>
-      </section>
+      </GlassPanel>
       {(data?.degraded || isError) && <button className="data-notice" type="button" onClick={() => void refetch()}>网易云连接中 · 当前为预览数据，点击重试</button>}
     </div>
   )
+}
+
+function sampleTracks(pool: DemoTrack[], previous: DemoTrack[] = []) {
+  const count = Math.min(3, pool.length)
+  const previousIds = new Set(previous.map((track) => track.id))
+  const fresh = pool.filter((track) => !previousIds.has(track.id))
+  const candidates = fresh.length >= count ? fresh : pool
+  const shuffled = [...candidates]
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1))
+    ;[shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex]!, shuffled[index]!]
+  }
+  const selected = shuffled.slice(0, count)
+  if (count > 1 && selected.every((track, index) => track.id === previous[index]?.id)) selected.push(selected.shift()!)
+  return selected
 }

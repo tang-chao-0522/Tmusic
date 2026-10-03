@@ -17,7 +17,7 @@ NETEASE_API_URL=http://localhost:3000
 CREDENTIAL_ENCRYPTION_KEY=生成的Base64内容
 ```
 
-不要把真实 Cookie 或 `.env` 提交到 Git。`NETEASE_COOKIE` 只作为单用户本地调试后备方案，推荐使用二维码绑定。
+不要把真实 Cookie 或 `.env` 提交到 Git。`NETEASE_COOKIE` 仅用于无用户上下文的公开目录请求；个人资料、音乐库和播放权限只使用当前浏览器扫码保存的凭据。前端会为每个浏览器生成匿名标识；它不能替代正式账号认证。
 
 ## 2. 启动依赖
 

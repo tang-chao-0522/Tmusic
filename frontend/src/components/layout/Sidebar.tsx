@@ -1,7 +1,7 @@
 import { Clock3, Heart, Home, Library, Music2, RadioTower, Search, Sparkles } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getNeteaseLoginStatus } from '../../lib/api'
+import { queries } from '../../lib/queries'
 
 const navItems = [
   { to: '/discover', label: '发现', icon: Home },
@@ -13,7 +13,7 @@ const navItems = [
 ]
 
 export function Sidebar() {
-  const { data: account } = useQuery({ queryKey: ['netease-login-status'], queryFn: getNeteaseLoginStatus, retry: false })
+  const { data: account } = useQuery(queries.accountStatus())
   return (
     <aside className="sidebar" aria-label="主导航">
       <NavLink to="/discover" className="brand-mark" aria-label="TMusic 首页">
