@@ -63,6 +63,25 @@ export const chatMessageSchema = z.object({
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>
 
+export const roomCommandSchema = z.object({
+  commandId: z.string().min(1).max(100),
+  knownStateVersion: z.number().int().nonnegative(),
+  type: z.enum(['PLAY', 'PAUSE', 'SEEK', 'NEXT', 'PREVIOUS', 'PLAY_TRACK']),
+  positionMs: z.number().int().nonnegative().optional(),
+  track: trackRefSchema.optional(),
+})
+export type RoomCommand = z.infer<typeof roomCommandSchema>
+
+export const roomQueueCommandSchema = z.object({
+  commandId: z.string().min(1).max(100),
+  knownQueueVersion: z.number().int().nonnegative(),
+  type: z.enum(['ADD', 'REMOVE', 'MOVE']),
+  track: trackRefSchema.optional(),
+  index: z.number().int().nonnegative().optional(),
+  toIndex: z.number().int().nonnegative().optional(),
+})
+export type RoomQueueCommand = z.infer<typeof roomQueueCommandSchema>
+
 export type CommentSource = 'tmusic' | 'netease'
 
 export type ApiEnvelope<T> = {

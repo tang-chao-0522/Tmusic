@@ -210,6 +210,26 @@ export class NeteaseProvider implements MusicProvider {
     return tracks
   }
 
+  async getLikedTracksPage(serializedCookie: string, offset: number, limit: number) {
+    const status = await this.loginStatus(serializedCookie)
+    const profile = status.data?.profile ?? status.profile
+    const account = status.data?.account ?? status.account
+    const userId = profile?.userId ?? account?.id
+    if (!isAuthenticatedNeteaseAccount(account)) throw new Error('Netease login is required')
+    const context = { userId: String(userId), serializedCookie }
+    const liked = await this.json<{ code?: number; ids?: number[] }>(`/likelist?uid=${userId}`, context)
+    if (liked.code !== 200) throw new Error(`Netease liked songs returned code ${liked.code}`)
+    const ids = liked.ids ?? []
+    const pageIds = ids.slice(offset, offset + limit)
+    if (!pageIds.length) return { items: [] as TrackRef[], total: ids.length, nextOffset: null as number | null }
+    const detail = await this.json<{ code?: number; songs?: Array<Record<string, any>> }>(`/song/detail?ids=${encodeURIComponent(pageIds.join(','))}`, context)
+    if (detail.code !== 200) throw new Error(`Netease song details returned code ${detail.code}`)
+    const byId = new Map((detail.songs ?? []).map((song) => [String(song.id), this.normalizeTrack(song)]))
+    const items = pageIds.flatMap((id) => { const track = byId.get(String(id)); return track ? [track] : [] })
+    const next = offset + pageIds.length
+    return { items, total: ids.length, nextOffset: next < ids.length ? next : null }
+  }
+
   async getHomeCatalog(serializedCookie?: string) {
     const newSongs = await this.json<{ code?: number; data?: Array<Record<string, any>> }>('/top/song?type=0')
     if (newSongs.code !== 200) throw new Error(`Netease new songs returned code ${newSongs.code}`)

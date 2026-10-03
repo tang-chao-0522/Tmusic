@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Clock3, Crown, Heart, ListMusic, LogOut, Music2, RefreshCw, UserRound } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PageTopbar } from '../components/layout/PageTopbar'
 import { GlassPanel } from '../components/shared/GlassPanel'
 import { Button } from '../components/ui/button'
 import { RecentTracks } from '../components/music/RecentTracks'
@@ -80,7 +79,7 @@ export function AccountPage() {
   const artists = overview.data?.artists
 
   return <div className="immersive-page account-page page-with-player">
-    <PageTopbar /><div className="ambient-petals" />
+    <div className="ambient-petals" />
     <div className="account-layout">
       <header className="account-heading"><span className="eyebrow">PERSONAL CENTER</span><h1>个人中心</h1><p>音乐在这里，陪你走过每一段旅程。</p></header>
       {status.isPending ? <GlassPanel className="account-feedback">正在读取账号信息…</GlassPanel> : null}

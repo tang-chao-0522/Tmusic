@@ -1,8 +1,12 @@
-import type { TrackRef } from '@tmusic/contracts'
+import type { ChatMessage, PlaybackState, RoomSettings, TrackRef } from '@tmusic/contracts'
 import { demoTracks, type DemoTrack } from '../data/tracks'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 const ACTOR_STORAGE_KEY = 'tmusic:anonymous-actor-id'
+
+export function realtimeOrigin() {
+  return import.meta.env.VITE_REALTIME_URL || new URL(API_URL, window.location.origin).origin
+}
 
 function browserActorId() {
   let actorId = localStorage.getItem(ACTOR_STORAGE_KEY)
@@ -69,6 +73,56 @@ export type SearchType = 'song' | 'playlist' | 'artist' | 'album'
 export type LibraryType = 'playlist' | 'liked' | 'album' | 'artist'
 export type CatalogItem = TrackRef | PlaylistSummary | AlbumSummary | ArtistSummary
 
+export type RoomMember = { userId: string; name: string; connections: number; lastSeen: number; ready: boolean }
+export type RoomSnapshot = {
+  room: { id: string; name: string; status: 'ACTIVE' | 'ENDED'; role: 'HOST' | 'CO_HOST' | 'MEMBER'; ownerId: string; coHostIds: string[]; visibility: string; maxMembers: number; settings: RoomSettings }
+  playback: PlaybackState
+  queue: TrackRef[]
+  members: RoomMember[]
+  messages: ChatMessage[]
+  realtimeTicket: string
+}
+
+export function ensureRoomSession() {
+  return request<{ userId: string; name: string }>('/rooms/session', { method: 'POST', body: '{}' })
+}
+
+export function getPublicRooms() {
+  return request<{ items: Array<{ id: string; name: string; members: number; maxMembers: number; trackName: string | null }> }>('/rooms')
+}
+
+export function createRoom(input: { name: string; visibility: 'PUBLIC' | 'PASSWORD' | 'INVITE_ONLY'; password?: string; maxMembers: number; settings: RoomSettings; initialQueue: TrackRef[] }) {
+  return request<{ id: string; inviteCode: string; shareUrl: string }>('/rooms', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function getRoomSnapshot(roomId: string, code?: string, password?: string) {
+  return request<RoomSnapshot>(`/rooms/${encodeURIComponent(roomId)}/join`, { method: 'POST', body: JSON.stringify({ code, password }) })
+}
+
+export function refreshRoomSnapshot(roomId: string) {
+  return request<RoomSnapshot>(`/rooms/${encodeURIComponent(roomId)}/snapshot`)
+}
+
+export function leaveRoom(roomId: string) {
+  return request(`/rooms/${encodeURIComponent(roomId)}/leave`, { method: 'POST', body: '{}' })
+}
+
+export function endRoom(roomId: string) {
+  return request(`/rooms/${encodeURIComponent(roomId)}/end`, { method: 'POST', body: '{}' })
+}
+
+export function updateRoomSettings(roomId: string, input: Partial<Pick<RoomSettings, 'controlMode' | 'allowTrackRequests' | 'chatEnabled'> & { maxMembers: number }>) {
+  return request<{ room: RoomSnapshot['room'] }>(`/rooms/${encodeURIComponent(roomId)}/settings`, { method: 'PATCH', body: JSON.stringify(input) })
+}
+
+export function setRoomCoHost(roomId: string, userId: string, enabled: boolean) {
+  return request<{ room: RoomSnapshot['room'] }>(`/rooms/${encodeURIComponent(roomId)}/co-host`, { method: 'POST', body: JSON.stringify({ userId, enabled }) })
+}
+
+export function rotateRoomInvite(roomId: string) {
+  return request<{ inviteCode: string; shareUrl: string }>(`/rooms/${encodeURIComponent(roomId)}/invite/rotate`, { method: 'POST', body: '{}' })
+}
+
 export function toUiTrack(track: TrackRef, index = 0): DemoTrack {
   const fallback = demoTracks[index % demoTracks.length]
   return {
@@ -107,6 +161,15 @@ export async function getNeteaseLibrary(type: LibraryType, signal?: AbortSignal)
   return {
     ...data,
     items: type === 'liked' ? (data.items as TrackRef[]).map(toUiTrack) : data.items,
+  }
+}
+
+export async function getLikedTracksPage(offset = 0, limit = 40, signal?: AbortSignal) {
+  const { data, meta } = await requestEnvelope<{ type: 'liked'; items: TrackRef[] }>(`/me/library?type=liked&offset=${offset}&limit=${limit}`, { signal })
+  return {
+    items: data.items.map((track, index) => toUiTrack(track, offset + index)),
+    total: Number(meta.total ?? 0),
+    nextOffset: meta.nextCursor === null || meta.nextCursor === undefined ? null : Number(meta.nextCursor),
   }
 }
 

@@ -20,6 +20,7 @@ export function App() {
         <Route path="/library" element={<LibraryPage />} />
         <Route path="/player" element={<PlayerPage />} />
         <Route path="/room" element={<RoomPage />} />
+        <Route path="/room/:roomId" element={<RoomPage />} />
         <Route path="/ai" element={<AiPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/login" element={<AccountPage />} />

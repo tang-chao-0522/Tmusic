@@ -7,6 +7,8 @@ import { appQueryClient } from './lib/queryClient'
 import './styles/tailwind.css'
 import './styles/global.css'
 import './styles/immersive.css'
+import './styles/room.css'
+import './styles/favorites.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -2,7 +2,7 @@ import { infiniteQueryOptions, queryOptions, type QueryClient } from '@tanstack/
 import type { DemoTrack } from '../data/tracks'
 import {
   getAccountOverview, getCatalogHome, getNeteaseComments, getNeteaseLibrary,
-  getNeteaseLoginStatus, getRecentTracks, getTmusicComments, getTrackLyrics,
+  getNeteaseLoginStatus, getRecentTracks, getLikedTracksPage, getTmusicComments, getTrackLyrics,
   resolvePlayback, searchCatalog, type LibraryType, type PlaybackGrant, type SearchType,
 } from './api'
 
@@ -16,6 +16,7 @@ export const queryKeys = {
   accountOverview: (userId: number) => ['netease-account-overview', userId] as const,
   libraryRoot: ['netease-library'] as const,
   library: (userId: number, type: LibraryType) => ['netease-library', userId, type] as const,
+  likedTracks: (userId: number) => ['netease-library', userId, 'liked', 'paged'] as const,
   recentRoot: ['netease-recent-tracks'] as const,
   recent: (userId: number) => ['netease-recent-tracks', userId] as const,
   playlists: ['netease-playlists'] as const,
@@ -36,6 +37,11 @@ export const queries = {
   accountStatus: () => queryOptions({ queryKey: queryKeys.accountStatus, queryFn: ({ signal }) => getNeteaseLoginStatus(signal), staleTime: 2 * minute, retry: false }),
   accountOverview: (userId: number) => queryOptions({ queryKey: queryKeys.accountOverview(userId), queryFn: ({ signal }) => getAccountOverview(signal), staleTime: 2 * minute, retry: false }),
   library: (userId: number, type: LibraryType) => queryOptions({ queryKey: queryKeys.library(userId, type), queryFn: ({ signal }) => getNeteaseLibrary(type, signal), staleTime: 3 * minute, retry: false }),
+  likedTracks: (userId: number) => infiniteQueryOptions({
+    queryKey: queryKeys.likedTracks(userId), queryFn: ({ pageParam, signal }) => getLikedTracksPage(pageParam, 40, signal),
+    initialPageParam: 0, getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
+    staleTime: 3 * minute, retry: false,
+  }),
   recent: (userId: number) => infiniteQueryOptions({
     queryKey: queryKeys.recent(userId), queryFn: ({ pageParam, signal }) => getRecentTracks(pageParam, 30, signal),
     initialPageParam: 0, getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,

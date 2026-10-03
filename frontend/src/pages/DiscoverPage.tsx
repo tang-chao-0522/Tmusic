@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { MoreHorizontal, Play, Plus, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { PageTopbar } from '../components/layout/PageTopbar'
 import { TrackListItem } from '../components/music/TrackListItem'
 import { GlassPanel } from '../components/shared/GlassPanel'
 import { SectionHeading } from '../components/shared/SectionHeading'
@@ -27,7 +26,7 @@ export function DiscoverPage() {
 
   return (
     <div className="immersive-page home-page page-with-player">
-      <PageTopbar /><div className="ambient-petals" />
+      <div className="ambient-petals" />
       <section className="home-copy">
         <span className="eyebrow">FEATURED TODAY</span><h1>{hero.name}</h1><h2>{hero.artists[0]?.name}</h2>
         <p>「那些曾听见的声音，<br />仍在某处轻轻回响。」</p>

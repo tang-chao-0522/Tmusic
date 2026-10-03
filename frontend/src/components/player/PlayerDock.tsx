@@ -6,6 +6,8 @@ import { usePlayerStore } from '../../stores/playerStore'
 import { TrackArtwork } from './TrackArtwork'
 import { appQueryClient } from '../../lib/queryClient'
 import { getCachedPlaybackGrant } from '../../lib/queries'
+import { emitRoomTrackEnded } from '../../lib/roomPlaybackEvents'
+import { getAudioEngine } from '../../lib/audioEngine'
 
 export function PlayerDock() {
   const state = usePlayerStore()
@@ -15,11 +17,11 @@ export function PlayerDock() {
   const [playbackError, setPlaybackError] = useState('')
 
   useEffect(() => {
-    const audio = new Audio()
+    const audio = getAudioEngine()
     audio.preload = 'none'
     audioRef.current = audio
     audio.ontimeupdate = () => usePlayerStore.getState().seek(Math.floor(audio.currentTime * 1000))
-    audio.onended = () => usePlayerStore.getState().next()
+    audio.onended = () => { if (usePlayerStore.getState().roomMode) emitRoomTrackEnded(); else usePlayerStore.getState().next() }
     return () => { audio.pause(); audio.src = ''; audioRef.current = null }
   }, [])
 
@@ -77,13 +79,13 @@ export function PlayerDock() {
 
       <div className="player-center">
         <div className="transport-controls">
-          <button className={`bare-button ${state.shuffle ? 'is-active' : ''}`} type="button" onClick={state.toggleShuffle} aria-label="随机播放"><Shuffle size={18} /></button>
-          <button className="bare-button" type="button" onClick={state.previous} aria-label="上一首"><SkipBack size={19} fill="currentColor" /></button>
-          <button className="play-toggle" type="button" onClick={state.toggle} aria-label={state.isPlaying ? '暂停' : '播放'}>
+          <button className={`bare-button ${state.shuffle ? 'is-active' : ''}`} type="button" onClick={state.toggleShuffle} disabled={state.roomMode} aria-label="随机播放"><Shuffle size={18} /></button>
+          <button className="bare-button" type="button" onClick={state.previous} disabled={state.roomMode} aria-label="上一首"><SkipBack size={19} fill="currentColor" /></button>
+          <button className="play-toggle" type="button" onClick={state.toggle} disabled={state.roomMode} aria-label={state.isPlaying ? '暂停' : '播放'}>
             {state.isPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" />}
           </button>
-          <button className="bare-button" type="button" onClick={state.next} aria-label="下一首"><SkipForward size={19} fill="currentColor" /></button>
-          <button className={`bare-button ${state.repeatMode !== 'off' ? 'is-active' : ''}`} type="button" onClick={state.cycleRepeat} aria-label="循环模式"><Repeat2 size={18} /></button>
+          <button className="bare-button" type="button" onClick={state.next} disabled={state.roomMode} aria-label="下一首"><SkipForward size={19} fill="currentColor" /></button>
+          <button className={`bare-button ${state.repeatMode !== 'off' ? 'is-active' : ''}`} type="button" onClick={state.cycleRepeat} disabled={state.roomMode} aria-label="循环模式"><Repeat2 size={18} /></button>
         </div>
         <div className="progress-row">
           <span>{formatDuration(state.progressMs)}</span>
@@ -94,6 +96,7 @@ export function PlayerDock() {
             max={track.durationMs}
             value={Math.min(state.progressMs, track.durationMs)}
             onChange={(event) => state.seek(Number(event.target.value))}
+            disabled={state.roomMode}
             style={{ '--range-progress': `${(state.progressMs / track.durationMs) * 100}%` } as React.CSSProperties}
             aria-label="播放进度"
           />

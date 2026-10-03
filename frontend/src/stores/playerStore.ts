@@ -13,6 +13,11 @@ type PlayerState = {
   shuffle: boolean
   repeatMode: RepeatMode
   queueOpen: boolean
+  roomMode: boolean
+  personalSnapshot: { queue: DemoTrack[]; currentId: string; progressMs: number; isPlaying: boolean } | null
+  enterRoom: () => void
+  syncRoom: (queue: DemoTrack[], currentId: string, positionMs: number, isPlaying: boolean) => void
+  leaveRoom: () => void
   openQueue: () => void
   closeQueue: () => void
   play: (track?: DemoTrack) => void
@@ -39,6 +44,11 @@ export const usePlayerStore = create<PlayerState>()(
       shuffle: false,
       repeatMode: 'all',
       queueOpen: false,
+      roomMode: false,
+      personalSnapshot: null,
+      enterRoom: () => set((state) => state.roomMode ? state : { roomMode: true, personalSnapshot: { queue: state.queue, currentId: state.currentId, progressMs: state.progressMs, isPlaying: state.isPlaying }, isPlaying: false }),
+      syncRoom: (queue, currentId, positionMs, isPlaying) => set({ queue, currentId, progressMs: positionMs, isPlaying, roomMode: true }),
+      leaveRoom: () => set((state) => state.personalSnapshot ? { ...state.personalSnapshot, roomMode: false, personalSnapshot: null } : state.roomMode ? { roomMode: false, isPlaying: false } : state),
       openQueue: () => set({ queueOpen: true }),
       closeQueue: () => set({ queueOpen: false }),
       play: (track) =>
@@ -89,9 +99,9 @@ export const usePlayerStore = create<PlayerState>()(
     {
       name: 'tmusic:player',
       partialize: (state) => ({
-        queue: state.queue,
-        currentId: state.currentId,
-        progressMs: state.progressMs,
+        queue: state.personalSnapshot?.queue ?? state.queue,
+        currentId: state.personalSnapshot?.currentId ?? state.currentId,
+        progressMs: state.personalSnapshot?.progressMs ?? state.progressMs,
         volume: state.volume,
         shuffle: state.shuffle,
         repeatMode: state.repeatMode,

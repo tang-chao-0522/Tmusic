@@ -4,12 +4,12 @@ import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { queries } from '../../lib/queries'
 
-export function PageTopbar({ compact = false }: { compact?: boolean }) {
+export function PageTopbar() {
   const navigate = useNavigate()
   const { data: account } = useQuery(queries.accountStatus())
 
   return (
-    <header className={`page-topbar ${compact ? 'compact' : ''}`}>
+    <header className="page-topbar">
       <button className="global-search" type="button" onClick={() => navigate('/search')}>
         <Search size={18} />
         <span>搜索喜欢的歌曲、歌手或专辑...</span>

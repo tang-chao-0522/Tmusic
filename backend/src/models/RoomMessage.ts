@@ -12,6 +12,7 @@ const roomMessageSchema = new Schema(
     type: { type: String, enum: ['TEXT', 'TRACK'], default: 'TEXT' },
     text: { type: String, maxlength: 500 },
     track: { type: Schema.Types.Mixed },
+    expiresAt: { type: Date, index: { expireAfterSeconds: 0 } },
   },
   { timestamps: true },
 )

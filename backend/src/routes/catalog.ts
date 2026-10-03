@@ -45,12 +45,20 @@ export const catalogRoutes: FastifyPluginAsync<{ provider: NeteaseProvider }> = 
   })
 
   app.get('/me/library', async (request, reply) => {
-    const query = request.query as { type?: string }
+    const query = request.query as { type?: string; offset?: string; limit?: string }
     const type = query.type ?? 'playlist'
     if (!['playlist', 'liked', 'album', 'artist'].includes(type)) return fail(reply, request, 422, 'VALIDATION_ERROR', '音乐库分类不合法')
+    const paged = query.offset !== undefined || query.limit !== undefined
+    const offset = Number(query.offset ?? 0)
+    const limit = Number(query.limit ?? 40)
+    if (paged && (type !== 'liked' || !Number.isSafeInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 100)) return fail(reply, request, 422, 'VALIDATION_ERROR', '分页参数不合法')
     const cookie = await getNeteaseCookie(actorFrom(request))
     if (!cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_REQUIRED', '请先连接网易云音乐账号')
     try {
+      if (paged) {
+        const page = await options.provider.getLikedTracksPage(cookie, offset, limit)
+        return ok(request, { type, items: page.items }, { total: page.total, hasMore: page.nextOffset !== null, nextCursor: page.nextOffset === null ? null : String(page.nextOffset) })
+      }
       const items = await options.provider.getUserLibrary(type as 'playlist' | 'liked' | 'album' | 'artist', cookie)
       return ok(request, { type, items })
     } catch (error) {

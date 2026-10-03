@@ -9,6 +9,7 @@ const envSchema = z.object({
   NETEASE_API_URL: z.string().url().default('http://localhost:3000'),
   NETEASE_COOKIE: z.string().optional(),
   CREDENTIAL_ENCRYPTION_KEY: z.string().optional(),
+  ROOM_SESSION_SECRET: z.string().optional(),
 })
 
 export const env = envSchema.parse(process.env)

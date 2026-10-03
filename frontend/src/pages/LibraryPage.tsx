@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Disc3, Heart, ListMusic, Music2, UserRound } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { PageTopbar } from '../components/layout/PageTopbar'
 import { TrackListItem } from '../components/music/TrackListItem'
 import { GlassPanel } from '../components/shared/GlassPanel'
 import type { DemoTrack } from '../data/tracks'
@@ -24,7 +23,7 @@ export function LibraryPage() {
   const label = tabs.find((tab) => tab.value === type)?.label ?? '音乐库'
 
   return <div className="immersive-page library-page-v2 page-with-player">
-    <PageTopbar /><div className="ambient-petals" />
+    <div className="ambient-petals" />
     <section className="library-title"><h1>音乐库</h1><p>{account.data?.authenticated ? `${account.data.profile?.nickname ?? '我的'} · 网易云个人音乐` : '连接网易云，带回属于你的音乐。'}</p></section>
     <nav className="library-tabs" aria-label="音乐库分类">{tabs.map(({ value, label: tabLabel, icon: Icon }) => <button key={value} type="button" className={type === value ? 'active' : ''} onClick={() => setType(value)}><Icon />{tabLabel}</button>)}</nav>
     {account.isPending ? <LibraryMessage text="正在读取网易云登录状态…" /> : null}

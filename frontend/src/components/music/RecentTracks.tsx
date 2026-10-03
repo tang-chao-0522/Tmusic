@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Music2, Play } from 'lucide-react'
+import { Music2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, type UIEvent } from 'react'
 import { toUiTrack } from '../../lib/api'
 import { queries } from '../../lib/queries'
@@ -41,11 +41,10 @@ export function RecentTracks({ userId }: { userId: number }) {
           {recent.isFetchNextPageError ? <button type="button" onClick={() => void recent.fetchNextPage()}>加载失败，点击重试</button> : '正在加载更多…'}
         </div>
         const { track, playedAt } = item
-        return <div className="account-recent-row" key={`${track.sourceId}-${row.index}`} style={{ position: 'absolute', top: row.start, height: row.size, width: '100%' }}>
+        return <div className="account-recent-row" key={`${track.sourceId}-${row.index}`} style={{ position: 'absolute', top: row.start, height: row.size, width: '100%' }} role="button" tabIndex={0} aria-label={`播放 ${track.name}`} onClick={() => play(toUiTrack(track, row.index))} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); play(toUiTrack(track, row.index)) } }}>
           <div className="account-recent-art">{track.coverUrl ? <img src={track.coverUrl} alt="" /> : <Music2 size={20} />}</div>
           <div className="account-recent-copy"><strong>{track.name}</strong><small>{track.artists.map((artist) => artist.name).join('、') || '未知歌手'}</small></div>
           <time>{playedAt ? new Date(playedAt).toLocaleDateString('zh-CN') : ''}</time>
-          <button type="button" aria-label={`播放${track.name}`} onClick={() => play(toUiTrack(track, row.index))}><Play size={15} fill="currentColor" /></button>
         </div>
       })}
     </div>
