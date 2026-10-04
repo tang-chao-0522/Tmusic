@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { demoTracks, type DemoTrack } from '../data/tracks'
+import { requestRoomPlay, requestRoomSeek } from '../lib/roomPlaybackEvents'
 
 type RepeatMode = 'off' | 'all' | 'one'
 
@@ -27,6 +28,7 @@ type PlayerState = {
   next: () => void
   previous: () => void
   seek: (progressMs: number) => void
+  updateProgress: (progressMs: number) => void
   setVolume: (volume: number) => void
   toggleShuffle: () => void
   cycleRepeat: () => void
@@ -51,13 +53,20 @@ export const usePlayerStore = create<PlayerState>()(
       leaveRoom: () => set((state) => state.personalSnapshot ? { ...state.personalSnapshot, roomMode: false, personalSnapshot: null } : state.roomMode ? { roomMode: false, isPlaying: false } : state),
       openQueue: () => set({ queueOpen: true }),
       closeQueue: () => set({ queueOpen: false }),
-      play: (track) =>
+      play: (track) => {
+        const state = get()
+        if (state.roomMode) {
+          const selected = track ?? state.queue.find((item) => item.id === state.currentId)
+          if (selected) requestRoomPlay(selected)
+          return
+        }
         set((state) => ({
           queue: track && !state.queue.some((item) => item.id === track.id) ? [track, ...state.queue] : state.queue,
           currentId: track?.id ?? state.currentId,
           progressMs: track && track.id !== state.currentId ? 0 : state.progressMs,
           isPlaying: true,
-        })),
+        }))
+      },
       playQueue: (tracks, startIndex = 0, shuffle = false) => {
         const selected = tracks[startIndex]
         if (!selected) return
@@ -68,6 +77,7 @@ export const usePlayerStore = create<PlayerState>()(
             ;[remaining[index], remaining[randomIndex]] = [remaining[randomIndex]!, remaining[index]!]
           }
         }
+        if (get().roomMode) { requestRoomPlay(selected, remaining); return }
         set({ queue: [selected, ...remaining], currentId: selected.id, progressMs: 0, isPlaying: true, shuffle })
       },
       pause: () => set({ isPlaying: false }),
@@ -86,13 +96,17 @@ export const usePlayerStore = create<PlayerState>()(
         const previousTrack = state.queue[index]
         if (previousTrack) set({ currentId: previousTrack.id, progressMs: 0, isPlaying: true })
       },
-      seek: (progressMs) => set({ progressMs }),
+      seek: (progressMs) => {
+        if (get().roomMode) { set({ progressMs }); requestRoomSeek(progressMs); return }
+        set({ progressMs })
+      },
+      updateProgress: (progressMs) => set({ progressMs }),
       setVolume: (volume) => set({ volume }),
       toggleShuffle: () => set((state) => ({ shuffle: !state.shuffle })),
       cycleRepeat: () =>
         set((state) => ({ repeatMode: state.repeatMode === 'off' ? 'all' : state.repeatMode === 'all' ? 'one' : 'off' })),
       loadCatalogTracks: (tracks) => set((state) => {
-        if (!tracks.length || !state.queue.every((item) => item.sourceId.startsWith('demo-'))) return state
+        if (state.roomMode || !tracks.length || !state.queue.every((item) => item.sourceId.startsWith('demo-'))) return state
         return { queue: tracks, currentId: tracks[0]?.id ?? state.currentId, progressMs: 0, isPlaying: false }
       }),
     }),

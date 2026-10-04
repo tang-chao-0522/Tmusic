@@ -1,5 +1,4 @@
 import { Outlet, useLocation } from 'react-router-dom'
-import { AiOrb } from '../shared/AiOrb'
 import { PlayerDock } from '../player/PlayerDock'
 import { PlaybackQueueDrawer } from '../player/PlaybackQueueDrawer'
 import { Sidebar } from './Sidebar'
@@ -29,7 +28,6 @@ export function AppShell() {
         {/* The room connection and audio sync must outlive child route changes. */}
         <RoomPage />
       </main>
-      <AiOrb />
       <PlayerDock />
       <PlaybackQueueDrawer />
     </div>

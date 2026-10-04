@@ -9,6 +9,7 @@ import './styles/global.css'
 import './styles/immersive.css'
 import './styles/room.css'
 import './styles/favorites.css'
+import './styles/floating-player.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

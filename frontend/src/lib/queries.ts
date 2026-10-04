@@ -1,7 +1,7 @@
 import { infiniteQueryOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 import type { DemoTrack } from '../data/tracks'
 import {
-  getAccountOverview, getCatalogHome, getNeteaseComments, getNeteaseLibrary,
+  getAccountOverview, getCatalogHome, getNeteaseComments, getNeteaseLibrary, getLikedIds, getPlaylistTracks,
   getNeteaseLoginStatus, getRecentTracks, getLikedTracksPage, getTmusicComments, getTrackLyrics,
   resolvePlayback, searchCatalog, type LibraryType, type PlaybackGrant, type SearchType,
 } from './api'
@@ -17,6 +17,8 @@ export const queryKeys = {
   libraryRoot: ['netease-library'] as const,
   library: (userId: number, type: LibraryType) => ['netease-library', userId, type] as const,
   likedTracks: (userId: number) => ['netease-library', userId, 'liked', 'paged'] as const,
+  likedIds: (userId: number) => ['netease-library', userId, 'liked-ids'] as const,
+  playlistTracks: (userId: number, playlistId: string) => ['netease-library', userId, 'playlist-tracks', playlistId] as const,
   recentRoot: ['netease-recent-tracks'] as const,
   recent: (userId: number) => ['netease-recent-tracks', userId] as const,
   playlists: ['netease-playlists'] as const,
@@ -42,6 +44,8 @@ export const queries = {
     initialPageParam: 0, getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
     staleTime: 3 * minute, retry: false,
   }),
+  likedIds: (userId: number) => queryOptions({ queryKey: queryKeys.likedIds(userId), queryFn: ({ signal }) => getLikedIds(signal), staleTime: minute, retry: false }),
+  playlistTracks: (userId: number, playlistId: string) => queryOptions({ queryKey: queryKeys.playlistTracks(userId, playlistId), queryFn: ({ signal }) => getPlaylistTracks(playlistId, signal), staleTime: minute, retry: false }),
   recent: (userId: number) => infiniteQueryOptions({
     queryKey: queryKeys.recent(userId), queryFn: ({ pageParam, signal }) => getRecentTracks(pageParam, 30, signal),
     initialPageParam: 0, getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,

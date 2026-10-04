@@ -36,6 +36,61 @@ export class NeteaseProvider implements MusicProvider {
     return response.json() as Promise<T>
   }
 
+  private async authenticatedContext(serializedCookie: string) {
+    const status = await this.loginStatus(serializedCookie)
+    const account = status.data?.account ?? status.account
+    const profile = status.data?.profile ?? status.profile
+    if (!isAuthenticatedNeteaseAccount(account)) throw new Error('Netease login is required')
+    return { userId: String(profile?.userId ?? account.id), serializedCookie }
+  }
+
+  async getLikedIds(serializedCookie: string) {
+    const context = await this.authenticatedContext(serializedCookie)
+    const payload = await this.json<{ code?: number; ids?: number[] }>(`/likelist?uid=${context.userId}`, context)
+    if (payload.code !== 200) throw new Error(`Netease liked songs returned code ${payload.code}`)
+    return (payload.ids ?? []).map(String)
+  }
+
+  async setLiked(sourceId: string, like: boolean, serializedCookie: string) {
+    const context = await this.authenticatedContext(serializedCookie)
+    const payload = await this.json<{ code?: number; message?: string }>(`/like?id=${sourceId}&like=${like}`, context)
+    if (payload.code !== 200) throw new Error(payload.message || `Netease like returned code ${payload.code}`)
+    return { sourceId, liked: like }
+  }
+
+  async createPlaylist(name: string, serializedCookie: string) {
+    const context = await this.authenticatedContext(serializedCookie)
+    const payload = await this.json<{ code?: number; id?: number; playlist?: Record<string, any>; message?: string }>(`/playlist/create?name=${encodeURIComponent(name)}&privacy=0`, context)
+    if (payload.code !== 200 || !(payload.id ?? payload.playlist?.id)) throw new Error(payload.message || `Netease playlist create returned code ${payload.code}`)
+    return { id: String(payload.id ?? payload.playlist?.id) }
+  }
+
+  async addPlaylistTrack(playlistId: string, sourceId: string, serializedCookie: string) {
+    const playlists = await this.getUserLibrary('playlist', serializedCookie) as PlaylistSummary[]
+    if (!playlists.some((item) => item.id === playlistId && !item.subscribed)) throw new Error('PLAYLIST_NOT_OWNED')
+    const context = await this.authenticatedContext(serializedCookie)
+    const payload = await this.json<{ code?: number; message?: string }>(`/playlist/tracks?op=add&pid=${playlistId}&tracks=${sourceId}`, context)
+    if (payload.code !== 200) throw new Error(payload.message || `Netease playlist tracks returned code ${payload.code}`)
+    return { playlistId, sourceId }
+  }
+
+  async getPlaylistTracks(playlistId: string, serializedCookie: string) {
+    const context = await this.authenticatedContext(serializedCookie)
+    const payload = await this.json<{ code?: number; playlist?: Record<string, any> }>(`/playlist/detail?id=${playlistId}`, context)
+    if (payload.code !== 200 || !payload.playlist) throw new Error(`Netease playlist detail returned code ${payload.code}`)
+    const playlist = payload.playlist
+    const ids = (playlist.trackIds?.length ? playlist.trackIds : playlist.tracks ?? []).map((item: { id: number }) => String(item.id)) as string[]
+    const tracks: TrackRef[] = []
+    for (let start = 0; start < ids.length; start += 500) {
+      const chunk = ids.slice(start, start + 500)
+      const detail = await this.json<{ code?: number; songs?: Array<Record<string, any>> }>(`/song/detail?ids=${encodeURIComponent(chunk.join(','))}`, context)
+      if (detail.code !== 200) throw new Error(`Netease song details returned code ${detail.code}`)
+      const byId = new Map((detail.songs ?? []).map((song) => [String(song.id), this.normalizeTrack(song)]))
+      tracks.push(...chunk.flatMap((id) => { const track = byId.get(id); return track ? [track] : [] }))
+    }
+    return { playlist: this.normalizePlaylist(playlist, Number(context.userId)), tracks }
+  }
+
   async health() {
     const payload = await this.json<{ data?: { code?: number }; code?: number }>('/login/status')
     return { reachable: true, upstreamCode: payload.data?.code ?? payload.code ?? null }
@@ -260,7 +315,7 @@ export class NeteaseProvider implements MusicProvider {
       description: String(item.description ?? item.copywriter ?? ''), trackCount: Number(item.trackCount ?? 0),
       durationText: '', coverUrl: item.coverImgUrl ?? item.picUrl ?? null,
       creatorName: creator.nickname ? String(creator.nickname) : undefined,
-      subscribed: ownerUserId === undefined ? Boolean(item.subscribed) : Number(creator.userId) !== ownerUserId,
+      subscribed: ownerUserId === undefined ? Boolean(item.subscribed) : Number(creator.userId ?? item.userId) !== ownerUserId,
     }
   }
 
