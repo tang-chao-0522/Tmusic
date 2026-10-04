@@ -1,6 +1,6 @@
 import { Server } from 'socket.io'
 import { createAdapter } from '@socket.io/redis-adapter'
-import { roomCommandSchema, roomQueueCommandSchema } from '@tmusic/contracts'
+import { ROOM_CAPACITY, roomCommandSchema, roomQueueCommandSchema } from '@tmusic/contracts'
 import { nanoid } from 'nanoid'
 import type { RedisClients } from '../infra/redis'
 import { verifyRoomTicket } from '../security/roomSession'
@@ -55,8 +55,8 @@ export function registerRealtime(io: Server, rooms: RoomService, redis: RedisCli
         const room = await rooms.setConnection(roomId, userId, 1)
         await socket.join(roomId)
         socket.data.joined = true
-        socket.emit('room:snapshot', { eventId: `evt_${nanoid()}`, roomId, serverTime: new Date().toISOString(), payload: { room: { id: room.id, name: room.name, status: room.status, role: rooms.roleOf(room, userId), ownerId: room.ownerId, coHostIds: room.coHostIds ?? [], visibility: room.visibility, settings: room.settings, maxMembers: room.maxMembers }, playback: room.playback, queue: room.queue, members: room.members, messages: await rooms.listMessages(room) } })
-        io.to(roomId).emit('room:members', { roomId, members: room.members, ownerId: room.ownerId, coHostIds: room.coHostIds ?? [] })
+        socket.emit('room:snapshot', { eventId: `evt_${nanoid()}`, roomId, serverTime: new Date().toISOString(), payload: { room: { id: room.id, name: room.name, status: room.status, role: rooms.roleOf(room, userId), ownerId: room.ownerId, maxMembers: ROOM_CAPACITY }, playback: room.playback, queue: room.queue, members: room.members, messages: await rooms.listMessages(room) } })
+        io.to(roomId).emit('room:members', { roomId, members: room.members, ownerId: room.ownerId })
         ack?.({ ok: true, data: { roomId }, serverTime: new Date().toISOString() })
       } catch (error) { ack?.(errorAck(error)) }
     })
@@ -70,7 +70,7 @@ export function registerRealtime(io: Server, rooms: RoomService, redis: RedisCli
         const track = String(event.payload?.trackKey ?? '')
         if (!Number.isSafeInteger(version) || !track) throw new RoomError('VALIDATION_ERROR', '准备状态不合法', 422)
         const room = await rooms.markReady(roomId, userId, version, track)
-        io.to(roomId).emit('room:members', { roomId, members: room.members, ownerId: room.ownerId, coHostIds: room.coHostIds ?? [] })
+        io.to(roomId).emit('room:members', { roomId, members: room.members, ownerId: room.ownerId })
         ack?.({ ok: true, data: {}, serverTime: new Date().toISOString() })
       } catch (error) { ack?.(errorAck(error)) }
     })
@@ -119,7 +119,7 @@ export function registerRealtime(io: Server, rooms: RoomService, redis: RedisCli
         const room = await rooms.leave(roomId, userId)
         socket.data.joined = false
         await socket.leave(roomId)
-        io.to(roomId).emit('room:members', { roomId, members: room.members, ownerId: room.ownerId, coHostIds: room.coHostIds ?? [] })
+        io.to(roomId).emit('room:members', { roomId, members: room.members, ownerId: room.ownerId })
         if (room.status === 'ENDED') io.to(roomId).emit('room:ended', { roomId, serverTime: new Date().toISOString() })
         ack?.({ ok: true, data: {}, serverTime: new Date().toISOString() })
       } catch (error) { ack?.(errorAck(error)) }
@@ -128,14 +128,14 @@ export function registerRealtime(io: Server, rooms: RoomService, redis: RedisCli
     socket.on('disconnect', () => {
       if (!socket.data.joined) return
       void rooms.setConnection(roomId, userId, -1).then((room) => {
-        io.to(roomId).emit('room:members', { roomId, members: room.members, ownerId: room.ownerId, coHostIds: room.coHostIds ?? [] })
+        io.to(roomId).emit('room:members', { roomId, members: room.members, ownerId: room.ownerId })
         setTimeout(() => {
           void (async () => {
             const latest = await rooms.get(roomId)
             const member = latest?.members.find((item) => item.userId === userId)
             if (!member || member.connections > 0 || Date.now() - member.lastSeen < 30_000) return
             const changed = await rooms.leave(roomId, userId)
-            io.to(roomId).emit('room:members', { roomId, members: changed.members, ownerId: changed.ownerId, coHostIds: changed.coHostIds ?? [] })
+            io.to(roomId).emit('room:members', { roomId, members: changed.members, ownerId: changed.ownerId })
             if (changed.status === 'ENDED') io.to(roomId).emit('room:ended', { roomId, serverTime: new Date().toISOString() })
           })().catch(() => undefined)
         }, 30_000).unref()

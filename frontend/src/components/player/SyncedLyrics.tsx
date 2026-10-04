@@ -20,7 +20,7 @@ function parseLines(source: string): LyricLine[] {
   return lines.sort((a, b) => (a.timeMs ?? Infinity) - (b.timeMs ?? Infinity))
 }
 
-export function SyncedLyrics({ sourceId, progressMs, onSeek }: { sourceId: string; progressMs: number; onSeek: (timeMs: number) => void }) {
+export function SyncedLyrics({ sourceId, progressMs, onSeek }: { sourceId: string; progressMs: number; onSeek?: (timeMs: number) => void }) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const lyrics = useQuery({ ...queries.lyrics(sourceId), enabled: /^\d+$/.test(sourceId) })
   const lines = useMemo(() => {
@@ -46,8 +46,8 @@ export function SyncedLyrics({ sourceId, progressMs, onSeek }: { sourceId: strin
     {lines.map((line, index) => <button
       type="button" key={`${line.timeMs}-${index}`} data-lyric-index={index}
       className={`lyric-line ${index === activeIndex ? 'active' : ''}`}
-      onClick={() => { if (line.timeMs !== null) onSeek(line.timeMs) }}
-      disabled={line.timeMs === null}
+      onClick={() => { if (line.timeMs !== null) onSeek?.(line.timeMs) }}
+      disabled={line.timeMs === null || !onSeek}
     ><span>{line.text}</span>{line.translation ? <small>{line.translation}</small> : null}</button>)}
   </div>
 }

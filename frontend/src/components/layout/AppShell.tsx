@@ -4,6 +4,7 @@ import { PlayerDock } from '../player/PlayerDock'
 import { PlaybackQueueDrawer } from '../player/PlaybackQueueDrawer'
 import { Sidebar } from './Sidebar'
 import { PageTopbar } from './PageTopbar'
+import { RoomPage } from '../../pages/RoomPage'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { queries } from '../../lib/queries'
@@ -25,6 +26,8 @@ export function AppShell() {
       <main className="app-main">
         {showTopbar ? <PageTopbar /> : null}
         <Outlet />
+        {/* The room connection and audio sync must outlive child route changes. */}
+        <RoomPage />
       </main>
       <AiOrb />
       <PlayerDock />

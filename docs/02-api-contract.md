@@ -381,38 +381,23 @@ type UserSummary = {
 
 REST 负责资源创建和快照，实时控制走 WebSocket。
 
+本节 6.1 记录当前房间接口。后续房间事件示例保留早期协议草案，实际字段以 `@tmusic/contracts` 与服务端实现为准。
+
 ### 6.1 房间管理
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| POST | `/rooms` | 创建房间 |
-| GET | `/rooms/:roomId` | 获取公开信息与自己的权限 |
+| POST | `/rooms/session` | 创建或续签访客会话 |
+| POST | `/rooms` | 创建固定双人邀请房间 |
+| POST | `/rooms/:roomId/join` | 使用邀请链接中的 `code` 加入 |
 | GET | `/rooms/:roomId/snapshot` | 获取权威完整快照 |
-| PATCH | `/rooms/:roomId` | 房主更新设置 |
-| POST | `/rooms/:roomId/join-ticket` | 校验口令/邀请并创建一次性 WS ticket |
 | POST | `/rooms/:roomId/leave` | 主动离开 |
 | POST | `/rooms/:roomId/end` | 房主结束房间 |
-| GET | `/rooms/:roomId/messages` | 历史消息游标分页 |
-| GET | `/rooms/discover` | 公开房发现（P1） |
 
 创建请求：
 
 ```json
-{
-  "name": "周六一起听",
-  "visibility": "INVITE_ONLY",
-  "password": null,
-  "maxMembers": 20,
-  "settings": {
-    "controlMode": "HOST_ONLY",
-    "allowTrackRequests": true,
-    "chatEnabled": true,
-    "messageRetention": "EPHEMERAL"
-  },
-  "initialQueue": [
-    { "provider": "netease", "sourceId": "123456" }
-  ]
-}
+{ "initialQueue": [] }
 ```
 
 创建响应：
@@ -421,8 +406,8 @@ REST 负责资源创建和快照，实时控制走 WebSocket。
 {
   "data": {
     "id": "room_01J...",
-    "joinCode": "8K4P2Q",
-    "shareUrl": "https://tmusic.example/room/room_01J...?invite=one-time-token",
+    "inviteCode": "high-entropy-token",
+    "shareUrl": "https://tmusic.example/room/room_01J...?code=high-entropy-token",
     "status": "ACTIVE",
     "role": "HOST"
   },
@@ -430,12 +415,7 @@ REST 负责资源创建和快照，实时控制走 WebSocket。
 }
 ```
 
-`joinCode` 只在策略允许时返回；服务端只存其哈希。邀请 token 可撤销、限时且不得赋予超出“加入房间”的权限。
-
-`messageRetention`：
-
-- `PERSISTENT`：消息写入 MongoDB，按房间保留策略清理。
-- `EPHEMERAL`：消息只写 Redis 临时流和客户端内存；房间结束或最后成员退出时删除 Redis key，并设置兜底 TTL。单个成员离开只清除其客户端缓存。
+邀请码仅在创建时返回，服务端只存哈希。房间固定最多两人，房主控制播放，双方可添加歌曲和聊天。聊天只保留在 Redis 临时列表或开发环境进程内存，房间结束时删除。
 
 ### 6.2 快照
 

@@ -1,8 +1,12 @@
-import type { ChatMessage, PlaybackState, RoomSettings, TrackRef } from '@tmusic/contracts'
+import type { ChatMessage, PlaybackState, TrackRef } from '@tmusic/contracts'
 import { demoTracks, type DemoTrack } from '../data/tracks'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 const ACTOR_STORAGE_KEY = 'tmusic:anonymous-actor-id'
+
+export class ApiError extends Error {
+  constructor(public code: string, message: string) { super(message) }
+}
 
 export function realtimeOrigin() {
   return import.meta.env.VITE_REALTIME_URL || new URL(API_URL, window.location.origin).origin
@@ -33,7 +37,7 @@ async function requestEnvelope<T>(path: string, init?: RequestInit): Promise<{ d
     headers,
   })
   const payload = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(payload?.error?.message || `Request failed: ${response.status}`)
+  if (!response.ok) throw new ApiError(payload?.error?.code || 'REQUEST_FAILED', payload?.error?.message || `Request failed: ${response.status}`)
   return payload as { data: T; meta: Record<string, unknown> }
 }
 
@@ -75,7 +79,7 @@ export type CatalogItem = TrackRef | PlaylistSummary | AlbumSummary | ArtistSumm
 
 export type RoomMember = { userId: string; name: string; connections: number; lastSeen: number; ready: boolean }
 export type RoomSnapshot = {
-  room: { id: string; name: string; status: 'ACTIVE' | 'ENDED'; role: 'HOST' | 'CO_HOST' | 'MEMBER'; ownerId: string; coHostIds: string[]; visibility: string; maxMembers: number; settings: RoomSettings }
+  room: { id: string; name: string; status: 'ACTIVE' | 'ENDED'; role: 'HOST' | 'MEMBER'; ownerId: string; maxMembers: number }
   playback: PlaybackState
   queue: TrackRef[]
   members: RoomMember[]
@@ -87,16 +91,12 @@ export function ensureRoomSession() {
   return request<{ userId: string; name: string }>('/rooms/session', { method: 'POST', body: '{}' })
 }
 
-export function getPublicRooms() {
-  return request<{ items: Array<{ id: string; name: string; members: number; maxMembers: number; trackName: string | null }> }>('/rooms')
-}
-
-export function createRoom(input: { name: string; visibility: 'PUBLIC' | 'PASSWORD' | 'INVITE_ONLY'; password?: string; maxMembers: number; settings: RoomSettings; initialQueue: TrackRef[] }) {
+export function createRoom(input: { initialQueue: TrackRef[] }) {
   return request<{ id: string; inviteCode: string; shareUrl: string }>('/rooms', { method: 'POST', body: JSON.stringify(input) })
 }
 
-export function getRoomSnapshot(roomId: string, code?: string, password?: string) {
-  return request<RoomSnapshot>(`/rooms/${encodeURIComponent(roomId)}/join`, { method: 'POST', body: JSON.stringify({ code, password }) })
+export function getRoomSnapshot(roomId: string, code?: string) {
+  return request<RoomSnapshot>(`/rooms/${encodeURIComponent(roomId)}/join`, { method: 'POST', body: JSON.stringify({ code }) })
 }
 
 export function refreshRoomSnapshot(roomId: string) {
@@ -109,18 +109,6 @@ export function leaveRoom(roomId: string) {
 
 export function endRoom(roomId: string) {
   return request(`/rooms/${encodeURIComponent(roomId)}/end`, { method: 'POST', body: '{}' })
-}
-
-export function updateRoomSettings(roomId: string, input: Partial<Pick<RoomSettings, 'controlMode' | 'allowTrackRequests' | 'chatEnabled'> & { maxMembers: number }>) {
-  return request<{ room: RoomSnapshot['room'] }>(`/rooms/${encodeURIComponent(roomId)}/settings`, { method: 'PATCH', body: JSON.stringify(input) })
-}
-
-export function setRoomCoHost(roomId: string, userId: string, enabled: boolean) {
-  return request<{ room: RoomSnapshot['room'] }>(`/rooms/${encodeURIComponent(roomId)}/co-host`, { method: 'POST', body: JSON.stringify({ userId, enabled }) })
-}
-
-export function rotateRoomInvite(roomId: string) {
-  return request<{ inviteCode: string; shareUrl: string }>(`/rooms/${encodeURIComponent(roomId)}/invite/rotate`, { method: 'POST', body: '{}' })
 }
 
 export function toUiTrack(track: TrackRef, index = 0): DemoTrack {

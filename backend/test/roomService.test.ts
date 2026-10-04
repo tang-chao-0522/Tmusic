@@ -4,7 +4,7 @@ import type { CreateRoomInput, TrackRef } from '@tmusic/contracts'
 import { RoomError, RoomService } from '../src/services/roomService'
 
 const track: TrackRef = { provider: 'netease', sourceId: '1974443814', name: '测试歌曲', artists: [{ sourceId: '1', name: '测试歌手' }], album: null, durationMs: 240_000, coverUrl: null, availability: 'UNKNOWN' }
-const input: CreateRoomInput = { name: '一起听测试', visibility: 'INVITE_ONLY', maxMembers: 2, settings: { controlMode: 'HOST_ONLY', allowTrackRequests: true, chatEnabled: true, messageRetention: 'EPHEMERAL' }, initialQueue: [track] }
+const input: CreateRoomInput = { initialQueue: [track] }
 
 test('room invitation, permissions, command deduplication and queue versions', async () => {
   const rooms = new RoomService(null)
@@ -12,6 +12,7 @@ test('room invitation, permissions, command deduplication and queue versions', a
   await assert.rejects(rooms.join(room.id, 'guest', '成员'), (error: unknown) => error instanceof RoomError && error.code === 'INVITE_REQUIRED')
   await rooms.join(room.id, 'guest', '成员', inviteCode)
   await assert.rejects(rooms.join(room.id, 'third', '第三人', inviteCode), (error: unknown) => error instanceof RoomError && error.code === 'ROOM_FULL')
+  await assert.rejects(rooms.leave(room.id, 'third'), (error: unknown) => error instanceof RoomError && error.code === 'ROOM_FORBIDDEN')
   await assert.rejects(rooms.playbackCommand(room.id, 'guest', { commandId: 'guest-play', knownStateVersion: 0, type: 'PLAY' }), (error: unknown) => error instanceof RoomError && error.code === 'ROOM_FORBIDDEN')
 
   const started = await rooms.playbackCommand(room.id, 'host', { commandId: 'play-1', knownStateVersion: 0, type: 'PLAY' })
@@ -33,24 +34,20 @@ test('room invitation, permissions, command deduplication and queue versions', a
   assert.ok(paused.room.playback.positionMs >= 0)
 })
 
-test('co-host permissions, live settings, invite rotation and host transfer', async () => {
+test('host transfer and temporary chat in a two-person room', async () => {
   const rooms = new RoomService(null)
-  const { room, inviteCode } = await rooms.create({ ...input, maxMembers: 4 }, 'owner-2', '房主')
+  const { room, inviteCode } = await rooms.create(input, 'owner-2', '房主')
   await rooms.join(room.id, 'listener-2', '听众', inviteCode)
-  await rooms.join(room.id, 'helper-2', '协作者', inviteCode)
-  await assert.rejects(rooms.setCoHost(room.id, 'listener-2', 'helper-2', true), (error: unknown) => error instanceof RoomError && error.code === 'ROOM_FORBIDDEN')
-  await rooms.setCoHost(room.id, 'owner-2', 'helper-2', true)
-  assert.equal(rooms.roleOf((await rooms.get(room.id))!, 'helper-2'), 'CO_HOST')
-  await assert.rejects(rooms.playbackCommand(room.id, 'helper-2', { commandId: 'helper-before', knownStateVersion: 0, type: 'PLAY' }), (error: unknown) => error instanceof RoomError && error.code === 'ROOM_FORBIDDEN')
-  await assert.rejects(rooms.updateSettings(room.id, 'owner-2', { controlMode: 'CO_HOST', allowTrackRequests: false, chatEnabled: false, maxMembers: 2 }), (error: unknown) => error instanceof RoomError && error.code === 'ROOM_CAPACITY_INVALID')
-  await rooms.updateSettings(room.id, 'owner-2', { controlMode: 'CO_HOST', allowTrackRequests: false, chatEnabled: false, maxMembers: 4 })
-  const started = await rooms.playbackCommand(room.id, 'helper-2', { commandId: 'helper-after', knownStateVersion: 0, type: 'PLAY' })
-  assert.equal(started.room.playback.isPlaying, true)
-  await assert.rejects(rooms.queueCommand(room.id, 'listener-2', { commandId: 'listener-add', knownQueueVersion: 1, type: 'ADD', track }), (error: unknown) => error instanceof RoomError && error.code === 'ROOM_FORBIDDEN')
-  const nextInvite = await rooms.rotateInvite(room.id, 'owner-2')
-  await assert.rejects(rooms.join(room.id, 'new-2', '新成员', inviteCode), (error: unknown) => error instanceof RoomError && error.code === 'INVITE_REQUIRED')
-  await rooms.join(room.id, 'new-2', '新成员', nextInvite.inviteCode)
+  await assert.rejects(rooms.playbackCommand(room.id, 'listener-2', { commandId: 'listener-play', knownStateVersion: 0, type: 'PLAY' }), (error: unknown) => error instanceof RoomError && error.code === 'ROOM_FORBIDDEN')
+  const first = await rooms.sendMessage((await rooms.get(room.id))!, 'listener-2', '听众', 'message-1', '你好')
+  const duplicate = await rooms.sendMessage((await rooms.get(room.id))!, 'listener-2', '听众', 'message-1', '你好')
+  assert.equal(duplicate.duplicate, true)
+  assert.equal(first.message.id, duplicate.message.id)
   await rooms.leave(room.id, 'owner-2')
-  assert.equal((await rooms.get(room.id))?.ownerId, 'helper-2')
-  assert.equal(rooms.roleOf((await rooms.get(room.id))!, 'helper-2'), 'HOST')
+  assert.equal((await rooms.get(room.id))?.ownerId, 'listener-2')
+  assert.equal(rooms.roleOf((await rooms.get(room.id))!, 'listener-2'), 'HOST')
+  const started = await rooms.playbackCommand(room.id, 'listener-2', { commandId: 'new-host-play', knownStateVersion: 0, type: 'PLAY' })
+  assert.equal(started.room.playback.isPlaying, true)
+  await rooms.end(room.id, 'listener-2')
+  assert.deepEqual(await rooms.listMessages((await rooms.get(room.id))!), [])
 })

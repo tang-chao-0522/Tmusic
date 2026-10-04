@@ -17,23 +17,11 @@ export const trackRefSchema = z.object({
 
 export type TrackRef = z.infer<typeof trackRefSchema>
 
-export const roomSettingsSchema = z.object({
-  controlMode: z.enum(['HOST_ONLY', 'CO_HOST']),
-  allowTrackRequests: z.boolean(),
-  chatEnabled: z.boolean(),
-  messageRetention: z.enum(['PERSISTENT', 'EPHEMERAL']),
-})
-
-export type RoomSettings = z.infer<typeof roomSettingsSchema>
+export const ROOM_CAPACITY = 2
 
 export const createRoomSchema = z.object({
-  name: z.string().trim().min(1).max(60),
-  visibility: z.enum(['PUBLIC', 'PASSWORD', 'INVITE_ONLY']),
-  password: z.string().min(4).max(32).nullable().optional(),
-  maxMembers: z.number().int().min(2).max(100).default(20),
-  settings: roomSettingsSchema,
   initialQueue: z.array(trackRefSchema).max(500).default([]),
-})
+}).strict()
 
 export type CreateRoomInput = z.infer<typeof createRoomSchema>
 
