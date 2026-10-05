@@ -1,0 +1,14 @@
+:80 {
+    encode gzip
+
+    @backend path /api/* /realtime /realtime/*
+    handle @backend {
+        reverse_proxy api:4100
+    }
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}

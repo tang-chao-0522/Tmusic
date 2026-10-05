@@ -1,0 +1,103 @@
+name: tmusic-production
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  web:
+    <<: *common
+    build:
+      context: .
+      target: web
+    # environment:
+    #   DOMAIN: ${DOMAIN:?请设置域名}
+    ports:
+      - "80:80"
+      # - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    <<: *common
+    build:
+      context: .
+      target: api
+    environment:
+      NODE_ENV: production
+      PORT: "4100"
+      WEB_ORIGIN: ${WEB_ORIGIN}
+      MONGODB_URI: mongodb://root:${MONGO_PASSWORD:?请设置数据库密码}@mongo:27017/tmusic?authSource=admin
+      REDIS_URL: redis://redis:6379
+      NETEASE_API_URL: http://netease-api:3000
+      ROOM_SESSION_SECRET: ${ROOM_SESSION_SECRET:?请设置房间密钥}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?请设置加密密钥}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      netease-api:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4100/api/v1/health').then(async r=>{const j=await r.json();if(!r.ok||!j.data.services.mongo||!j.data.services.redis)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  mongo:
+    <<: *common
+    image: mongo:8
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "quit(db.adminCommand({ping:1}).ok ? 0 : 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    <<: *common
+    image: redis:8-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  netease-api:
+    <<: *common
+    build:
+      context: ./infra/netease-api
+    environment:
+      PORT: "3000"
+
+volumes:
+  mongo_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
