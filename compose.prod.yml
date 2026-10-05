@@ -1,0 +1,80 @@
+services:
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - letsencrypt:/etc/letsencrypt:ro
+      - acme:/var/www/certbot:ro
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    env_file: deploy.env
+    environment:
+      NODE_ENV: production
+      PORT: 4100
+      MONGODB_URI: mongodb://mongo:27017/tmusic
+      REDIS_URL: redis://redis:6379
+      NETEASE_API_URL: http://netease-api:3000
+    depends_on:
+      - mongo
+      - redis
+      - netease-api
+
+  netease-api:
+    build:
+      context: ./infra/netease-api
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      no_proxy: "*"
+      NO_PROXY: "*"
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: [tools]
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - acme:/var/www/certbot
+
+  certbot-renew:
+    image: certbot/certbot:latest
+    profiles: [renewal]
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command: ["-c", "while true; do certbot renew --quiet; sleep 12h; done"]
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - acme:/var/www/certbot
+
+volumes:
+  mongo_data:
+  redis_data:
+  letsencrypt:
+  acme:
