@@ -63,8 +63,9 @@ export type RoomCommand = z.infer<typeof roomCommandSchema>
 export const roomQueueCommandSchema = z.object({
   commandId: z.string().min(1).max(100),
   knownQueueVersion: z.number().int().nonnegative(),
-  type: z.enum(['ADD', 'REMOVE', 'MOVE']),
+  type: z.enum(['ADD', 'REMOVE', 'MOVE', 'ADD_AND_PLAY']),
   track: trackRefSchema.optional(),
+  tracks: z.array(trackRefSchema).max(500).optional(),
   index: z.number().int().nonnegative().optional(),
   toIndex: z.number().int().nonnegative().optional(),
 })

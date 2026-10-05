@@ -10,6 +10,7 @@ import { formatDuration, type DemoTrack } from '../data/tracks'
 import { getNeteaseLibrary } from '../lib/api'
 import { queries } from '../lib/queries'
 import { usePlayerStore } from '../stores/playerStore'
+import { TrackActions } from '../components/music/TrackActions'
 
 export function FavoritesPage() {
   const [commentTrack, setCommentTrack] = useState<DemoTrack | null>(null)
@@ -103,7 +104,7 @@ export function FavoritesPage() {
                 <span className="track-muted">{track.album?.name}</span>
                 <span className="track-duration">{formatDuration(track.durationMs)}</span>
                 <div className="row-actions">
-                  <Heart size={17} fill="currentColor" aria-label="已喜欢" />
+                  <TrackActions track={track} />
                   <button type="button" onClick={(event) => { event.stopPropagation(); setCommentTrack(track) }} onKeyDown={(event) => event.stopPropagation()} aria-label={`查看 ${track.name} 的评论`}><MessageCircle size={17} /></button>
                 </div>
               </div>

@@ -7,9 +7,10 @@ import { useQuery } from '@tanstack/react-query'
 import { RoomLobby } from '../components/room/RoomLobby'
 import { RoomConnection } from '../components/room/RoomVisuals'
 import { PlaybackContentPanel } from '../components/player/PlaybackContentPanel'
+import { usePlaybackSeek } from '../components/player/usePlaybackSeek'
 import { formatDuration, type DemoTrack } from '../data/tracks'
 import { ApiError, endRoom, ensureRoomSession, getRoomSnapshot, leaveRoom, realtimeOrigin, refreshRoomSnapshot, searchCatalog, toUiTrack, type RoomSnapshot } from '../lib/api'
-import { onRoomTrackEnded } from '../lib/roomPlaybackEvents'
+import { onRoomPlayRequested, onRoomSeekRequested, onRoomTrackEnded } from '../lib/roomPlaybackEvents'
 import { getAudioEngine, resumeAudio, setAudioRate } from '../lib/audioEngine'
 import { usePlayerStore } from '../stores/playerStore'
 import { queries } from '../lib/queries'
@@ -99,6 +100,7 @@ function LiveRoom({ roomId, inviteCode, onClose }: RoomEntry & { onClose: () => 
   const canControl = role === 'HOST'
   const track = snapshot?.playback.track ? toUiTrack(snapshot.playback.track) : null
   const currentPosition = player.roomMode ? player.progressMs : snapshot?.playback.positionMs ?? 0
+  const progressControl = usePlaybackSeek(currentPosition, (positionMs) => playback('SEEK', { positionMs }), true, track?.id)
   const shareUrl = `${window.location.origin}/room/${roomId}?code=${encodeURIComponent(inviteCode ?? '')}`
 
   useEffect(() => { const timer = window.setTimeout(() => setSearchKeyword(searchTerm.trim()), 300); return () => window.clearTimeout(timer) }, [searchTerm])
@@ -191,12 +193,26 @@ function LiveRoom({ roomId, inviteCode, onClose }: RoomEntry & { onClose: () => 
     return () => { active = false; if (timer) window.clearInterval(timer); if (onCanPlay) getAudioEngine().removeEventListener('canplay', onCanPlay); setAudioRate(1); socket?.disconnect(); socketRef.current = null; snapshotRef.current = null; usePlayerStore.getState().leaveRoom() }
   }, [roomId, inviteCode, retry])
 
-  useEffect(() => onRoomTrackEnded(() => {
-    const current = snapshotRef.current
-    if (!current || current.room.role !== 'HOST') return
-    const type = current.queue.length > 1 ? 'NEXT' : 'PAUSE'
-    void send('playback:command', { commandId: crypto.randomUUID(), knownStateVersion: current.playback.stateVersion, type })
-  }), [roomId])
+  useEffect(() => {
+    const stopEnded = onRoomTrackEnded(() => {
+      const current = snapshotRef.current
+      if (!current || current.room.role !== 'HOST') return
+      const type = current.queue.length > 1 ? 'NEXT' : 'PAUSE'
+      void send('playback:command', { commandId: crypto.randomUUID(), knownStateVersion: current.playback.stateVersion, type })
+    })
+    const stopRequested = onRoomPlayRequested((track, tracks) => {
+      const current = snapshotRef.current
+      if (!current) { setError('房间尚未连接，请稍后重试'); return }
+      if (track.provider !== 'netease' || !/^\d+$/.test(track.sourceId)) { setError('这首歌曲暂时无法在房间播放'); return }
+      void send('queue:command', { commandId: crypto.randomUUID(), knownQueueVersion: current.playback.queueVersion, type: 'ADD_AND_PLAY', track: toTrackRef(track), tracks: tracks?.map(toTrackRef) })
+    })
+    const stopSeek = onRoomSeekRequested((positionMs) => {
+      const current = snapshotRef.current
+      if (!current) { setError('房间尚未连接，请稍后重试'); return }
+      void send('playback:command', { commandId: crypto.randomUUID(), knownStateVersion: current.playback.stateVersion, type: 'SEEK', positionMs })
+    })
+    return () => { stopEnded(); stopRequested(); stopSeek() }
+  }, [roomId])
 
   async function send(event: string, payload: object) {
     const socket = socketRef.current
@@ -210,6 +226,7 @@ function LiveRoom({ roomId, inviteCode, onClose }: RoomEntry & { onClose: () => 
 
   function playback(type: RoomCommand['type'], extra: Partial<RoomCommand> = {}) {
     if (!snapshot) return
+    if (type === 'SEEK' && extra.positionMs !== undefined) usePlayerStore.getState().updateProgress(extra.positionMs)
     void send('playback:command', { commandId: crypto.randomUUID(), knownStateVersion: snapshot.playback.stateVersion, type, ...extra })
   }
 
@@ -247,17 +264,16 @@ function LiveRoom({ roomId, inviteCode, onClose }: RoomEntry & { onClose: () => 
       <div className="room-track-copy"><span className="eyebrow">NOW PLAYING</span><h2>{track?.name ?? '房间队列还没有歌曲'}</h2><p>{track?.artists.map((artist) => artist.name).join(' / ') ?? '从下面的队列添加歌曲'}</p></div>
       {snapshot.playback.isPlaying && !player.isPlaying ? <button className="room-resume" type="button" onClick={() => { void resumeAudio().then(() => { const current = snapshotRef.current; if (current) { const queue = current.queue.map(toUiTrack); usePlayerStore.getState().syncRoom(queue, current.playback.track ? `${current.playback.track.provider}:${current.playback.track.sourceId}` : '', currentPosition, true) } }).catch(() => setError('此歌曲暂时无法播放，请检查账号或播放权限')) }}>点击继续播放</button> : null}
       <div className="room-controls"><button type="button" className="room-play-button" disabled={!canControl || !track || connection !== '已连接'} onClick={() => playback(snapshot.playback.isPlaying ? 'PAUSE' : 'PLAY')} aria-label={snapshot.playback.isPlaying ? '暂停' : '播放'}>{snapshot.playback.isPlaying ? <Pause size={25} fill="currentColor" /> : <Play size={25} fill="currentColor" />}</button><button type="button" disabled={!canControl || snapshot.queue.length < 2} onClick={() => playback('NEXT')} aria-label="下一首"><SkipForward /></button></div>
-      <div className="room-progress"><span>{formatDuration(currentPosition)}</span><input type="range" min={0} max={track?.durationMs ?? 0} value={Math.min(currentPosition, track?.durationMs ?? 0)} disabled={!canControl || !track} onChange={(event) => playback('SEEK', { positionMs: Number(event.target.value) })} aria-label="房间播放进度" /><span>{formatDuration(track?.durationMs ?? 0)}</span></div>
-      <div className="host-note"><Crown size={16} /> {role === 'HOST' ? '你是房主 · 可以控制播放' : '由房主控制播放'}</div>
+      <div className="room-progress"><span>{formatDuration(progressControl.value)}</span><input type="range" min={0} max={track?.durationMs ?? 0} value={Math.min(progressControl.value, track?.durationMs ?? 0)} disabled={!track || connection !== '已连接'} onChange={progressControl.onChange} onPointerUp={progressControl.onPointerUp} onKeyUp={progressControl.onKeyUp} onBlur={progressControl.onBlur} aria-label="房间播放进度" /><span>{formatDuration(track?.durationMs ?? 0)}</span></div>
+      <div className="host-note"><Crown size={16} /> {role === 'HOST' ? '你是房主 · 可以控制播放' : '可选歌播放和调整共听进度'}</div>
     </section><PlaybackContentPanel
       className="room-social"
       sourceId={track?.sourceId ?? null}
       progressMs={currentPosition}
-      onSeek={canControl ? (position) => playback('SEEK', { positionMs: position }) : undefined}
+      onSeek={(position) => playback('SEEK', { positionMs: position })}
       tracks={snapshot.queue.map(toUiTrack)}
       currentId={track?.id}
-      canSelect={canControl}
-      onPlay={(_, index) => playback('PLAY_TRACK', { track: snapshot.queue[index] })}
+      onPlay={(_, index) => queueCommand('ADD_AND_PLAY', { track: snapshot.queue[index] })}
       queueActions={canControl ? (_, index) => <span className="room-queue-actions">
         <button type="button" disabled={index === 0} onClick={() => queueCommand('MOVE', { index, toIndex: index - 1 })} aria-label={`上移 ${snapshot.queue[index]?.name}`}>↑</button>
         <button type="button" disabled={index === snapshot.queue.length - 1} onClick={() => queueCommand('MOVE', { index, toIndex: index + 1 })} aria-label={`下移 ${snapshot.queue[index]?.name}`}>↓</button>

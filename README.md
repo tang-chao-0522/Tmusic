@@ -39,4 +39,4 @@ npm run dev -w @tmusic/api
 
 ## 一起听
 
-打开 `/room` 创建双人房间，或粘贴朋友发来的邀请链接加入，无需先建立好友关系。房主控制播放，双方都可以点歌和聊天；聊天记录随房间结束删除。房间使用独立的签名访客会话；每位成员仍需通过自己的网易云连接获取可播放的音频。开发时 Redis 不可用会退回单进程内存房间，正式环境必须配置 Redis 和 `ROOM_SESSION_SECRET`，否则房间服务不启用。详见 [`docs/05-listening-room-technical-roadmap.md`](docs/05-listening-room-technical-roadmap.md)。
+打开 `/room` 创建双人房间，或粘贴朋友发来的邀请链接加入，无需先建立好友关系。房主控制暂停，双方都可以从任意页面选歌并同步播放、拖动共听进度和聊天；聊天记录随房间结束删除。房间使用独立的签名访客会话；每位成员仍需通过自己的网易云连接获取可播放的音频。开发时 Redis 不可用会退回单进程内存房间，正式环境必须配置 Redis 和 `ROOM_SESSION_SECRET`，否则房间服务不启用。详见 [`docs/05-listening-room-technical-roadmap.md`](docs/05-listening-room-technical-roadmap.md)。

@@ -165,6 +165,27 @@ export function getPlaylists(signal?: AbortSignal) {
   return request<{ featured: PlaylistSummary; items: PlaylistSummary[]; degraded: boolean }>('/me/playlists', { signal })
 }
 
+export function getLikedIds(signal?: AbortSignal) {
+  return request<{ ids: string[] }>('/me/liked-ids', { signal })
+}
+
+export function setTrackLiked(sourceId: string, liked: boolean) {
+  return request<{ sourceId: string; liked: boolean }>(`/me/liked/${encodeURIComponent(sourceId)}`, { method: 'PUT', body: JSON.stringify({ liked }) })
+}
+
+export function createNeteasePlaylist(name: string) {
+  return request<{ id: string }>('/me/playlists', { method: 'POST', body: JSON.stringify({ name }) })
+}
+
+export function addTrackToPlaylist(playlistId: string, sourceId: string) {
+  return request<{ playlistId: string; sourceId: string }>(`/me/playlists/${encodeURIComponent(playlistId)}/tracks`, { method: 'POST', body: JSON.stringify({ sourceId }) })
+}
+
+export async function getPlaylistTracks(playlistId: string, signal?: AbortSignal) {
+  const data = await request<{ playlist: PlaylistSummary; tracks: TrackRef[] }>(`/me/playlists/${encodeURIComponent(playlistId)}/tracks`, { signal })
+  return { ...data, tracks: data.tracks.map(toUiTrack) }
+}
+
 export type PlaybackGrant = {
   url: string
   expiresAt: string | null

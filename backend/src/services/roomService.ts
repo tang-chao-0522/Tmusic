@@ -166,7 +166,7 @@ return 1`
 
   async playbackCommand(roomId: string, userId: string, command: RoomCommand) {
     return this.update(roomId, (room) => {
-      if (!this.canControl(room, userId)) throw new RoomError('ROOM_FORBIDDEN', '没有控制播放的权限', 403)
+      if (!this.canControl(room, userId) && !(command.type === 'SEEK' && room.members.some((member) => member.userId === userId))) throw new RoomError('ROOM_FORBIDDEN', '没有控制播放的权限', 403)
       if (command.knownStateVersion !== room.playback.stateVersion) throw new RoomError('VERSION_CONFLICT', '播放状态已更新，请同步后重试', 409)
       const state = room.playback
       const now = Date.now()
@@ -207,11 +207,35 @@ return 1`
   async queueCommand(roomId: string, userId: string, command: RoomQueueCommand) {
     return this.update(roomId, (room) => {
       if (command.knownQueueVersion !== room.playback.queueVersion) throw new RoomError('VERSION_CONFLICT', '队列已更新，请同步后重试', 409)
-      if (!this.canControl(room, userId) && !(room.members.some((member) => member.userId === userId) && command.type === 'ADD')) throw new RoomError('ROOM_FORBIDDEN', '没有修改队列权限', 403)
+      if (!this.canControl(room, userId) && !(room.members.some((member) => member.userId === userId) && ['ADD', 'ADD_AND_PLAY'].includes(command.type))) throw new RoomError('ROOM_FORBIDDEN', '没有修改队列权限', 403)
       if (command.type === 'ADD') {
         if (!command.track || !validTrack(command.track) || room.queue.length >= 500) throw new RoomError('QUEUE_INVALID', '无法添加歌曲', 422)
         room.queue.push(command.track)
         if (!room.playback.track) room.playback.track = command.track
+      }
+      if (command.type === 'ADD_AND_PLAY') {
+        if (!command.track || !validTrack(command.track)) throw new RoomError('TRACK_INVALID', '无法播放这首歌曲', 422)
+        const additions: TrackRef[] = []
+        const known = new Set(room.queue.map(trackKey))
+        for (const track of [command.track, ...(command.tracks ?? [])]) {
+          if (!validTrack(track)) throw new RoomError('TRACK_INVALID', '队列中包含无法播放的歌曲', 422)
+          if (!known.has(trackKey(track))) { known.add(trackKey(track)); additions.push(track) }
+        }
+        if (room.queue.length + additions.length > 500) throw new RoomError('QUEUE_INVALID', '房间队列已满', 422)
+        if (command.tracks?.length) {
+          const existing = new Map(room.queue.map((item) => [trackKey(item), item]))
+          const selection = new Map([command.track, ...command.tracks].map((item) => [trackKey(item), existing.get(trackKey(item)) ?? item]))
+          room.queue = room.queue.filter((item) => !selection.has(trackKey(item)))
+          room.queue.push(...selection.values())
+        } else room.queue.push(...additions)
+        const selected = room.queue.find((item) => trackKey(item) === trackKey(command.track!))!
+        const now = new Date().toISOString()
+        room.playback.track = selected
+        room.playback.positionMs = 0
+        room.playback.isPlaying = true
+        room.playback.startedAt = now
+        room.playback.stateVersion++
+        room.members.forEach((member) => { member.ready = false })
       }
       if (command.type === 'REMOVE') {
         if (command.index === undefined || command.index >= room.queue.length) throw new RoomError('QUEUE_INVALID', '歌曲序号无效', 422)

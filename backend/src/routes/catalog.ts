@@ -6,6 +6,59 @@ import type { CatalogSearchType, NeteaseProvider } from '../providers/neteasePro
 import { getNeteaseCookie } from '../services/credentialService'
 
 export const catalogRoutes: FastifyPluginAsync<{ provider: NeteaseProvider }> = async (app, options) => {
+  const numericId = (value: unknown): value is string => typeof value === 'string' && /^[1-9]\d*$/.test(value)
+  const credential = async (request: Parameters<typeof actorFrom>[0]) => getNeteaseCookie(actorFrom(request))
+  const writeError = (reply: any, request: any, error: unknown) => {
+    request.log.warn({ err: error }, 'Netease library write failed')
+    if (error instanceof Error && error.message === 'Netease login is required') return fail(reply, request, 401, 'NETEASE_LOGIN_EXPIRED', '网易云登录已失效，请重新连接')
+    if (error instanceof Error && error.message === 'PLAYLIST_NOT_OWNED') return fail(reply, request, 403, 'PLAYLIST_NOT_OWNED', '只能添加到自己创建的歌单')
+    return fail(reply, request, 502, 'NETEASE_WRITE_FAILED', error instanceof Error ? error.message : '网易云操作失败', true)
+  }
+
+  app.get('/me/liked-ids', async (request, reply) => {
+    const cookie = await credential(request)
+    if (!cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_REQUIRED', '请先连接网易云音乐账号')
+    try { return ok(request, { ids: await options.provider.getLikedIds(cookie) }) }
+    catch (error) { return writeError(reply, request, error) }
+  })
+
+  app.put('/me/liked/:sourceId', async (request, reply) => {
+    const { sourceId } = request.params as { sourceId: string }
+    const { liked } = (request.body ?? {}) as { liked?: unknown }
+    if (!numericId(sourceId) || typeof liked !== 'boolean') return fail(reply, request, 422, 'VALIDATION_ERROR', '歌曲或收藏状态无效')
+    const cookie = await credential(request)
+    if (!cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_REQUIRED', '请先连接网易云音乐账号')
+    try { return ok(request, await options.provider.setLiked(sourceId, liked, cookie)) }
+    catch (error) { return writeError(reply, request, error) }
+  })
+
+  app.post('/me/playlists', async (request, reply) => {
+    const name = (request.body as { name?: unknown } | undefined)?.name
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 40) return fail(reply, request, 422, 'VALIDATION_ERROR', '歌单名称需要 1 到 40 个字')
+    const cookie = await credential(request)
+    if (!cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_REQUIRED', '请先连接网易云音乐账号')
+    try { return ok(request, await options.provider.createPlaylist(name.trim(), cookie)) }
+    catch (error) { return writeError(reply, request, error) }
+  })
+
+  app.post('/me/playlists/:playlistId/tracks', async (request, reply) => {
+    const { playlistId } = request.params as { playlistId: string }
+    const sourceId = (request.body as { sourceId?: unknown } | undefined)?.sourceId
+    if (!numericId(playlistId) || !numericId(sourceId)) return fail(reply, request, 422, 'VALIDATION_ERROR', '歌单或歌曲无效')
+    const cookie = await credential(request)
+    if (!cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_REQUIRED', '请先连接网易云音乐账号')
+    try { return ok(request, await options.provider.addPlaylistTrack(playlistId, sourceId, cookie)) }
+    catch (error) { return writeError(reply, request, error) }
+  })
+
+  app.get('/me/playlists/:playlistId/tracks', async (request, reply) => {
+    const { playlistId } = request.params as { playlistId: string }
+    if (!numericId(playlistId)) return fail(reply, request, 422, 'VALIDATION_ERROR', '歌单无效')
+    const cookie = await credential(request)
+    if (!cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_REQUIRED', '请先连接网易云音乐账号')
+    try { return ok(request, await options.provider.getPlaylistTracks(playlistId, cookie)) }
+    catch (error) { return writeError(reply, request, error) }
+  })
   app.get('/catalog/home', async (request) => {
     try {
       const live = await options.provider.getHomeCatalog(await getNeteaseCookie(actorFrom(request)))
