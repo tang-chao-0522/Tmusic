@@ -1,6 +1,6 @@
 # 在 1.15.171.136 用 Docker 部署
 
-服务器只需安装 Docker Engine 和 Compose 插件，无需在宿主机安装 Node.js、npm 或 Nginx。
+运行应用只需 Docker Engine 和 Compose 插件，无需在宿主机安装 Node.js、npm 或 Nginx。以下部署命令还会使用 Git 和 OpenSSL。
 本配置将前端、API、Nginx、MongoDB、Redis 和网易云接口服务全部放入容器。
 
 ## 准备
@@ -11,6 +11,7 @@
 
    ```bash
    ssh ubuntu@1.15.171.136
+   sudo apt update && sudo apt install -y git openssl
    git clone -b tc/agent https://github.com/tang-chao-0522/Tmusic.git ~/tmusic
    cd ~/tmusic
    ```
