@@ -109,6 +109,25 @@ export class NeteaseProvider implements MusicProvider {
     return this.json<{ code: number; message?: string; cookie?: string }>(`/login/qr/check?key=${encodeURIComponent(key)}`)
   }
 
+  private async authPost<T>(path: string, fields: Record<string, string>): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${path}?timestamp=${Date.now()}`, {
+      method: 'POST',
+      headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(fields),
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (response.status >= 500) throw new Error(`Netease provider returned HTTP ${response.status}`)
+    return response.json() as Promise<T>
+  }
+
+  sendPhoneCaptcha(phone: string) {
+    return this.authPost<{ code: number; message?: string }>('/captcha/sent', { phone, ctcode: '86' })
+  }
+
+  loginWithPhoneCaptcha(phone: string, captcha: string) {
+    return this.authPost<{ code: number; message?: string; cookie?: string }>('/login/cellphone', { phone, captcha, countrycode: '86' })
+  }
+
   async loginStatus(serializedCookie?: string) {
     return this.json<Record<string, any>>('/login/status', { userId: '', serializedCookie })
   }

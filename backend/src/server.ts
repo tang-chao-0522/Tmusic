@@ -17,7 +17,7 @@ import { RoomService } from './services/roomService'
 import { RoomError } from './services/roomService'
 import { registerRealtime } from './realtime/registerRealtime'
 
-const app = Fastify({ logger: { level: env.NODE_ENV === 'development' ? 'info' : 'warn', redact: ['req.headers.authorization', 'req.headers.cookie', 'body.password', 'body.cookie', 'res.headers.set-cookie'] } })
+const app = Fastify({ logger: { level: env.NODE_ENV === 'development' ? 'info' : 'warn', redact: ['req.headers.authorization', 'req.headers.cookie', 'body.password', 'body.cookie', 'body.phone', 'body.captcha', 'res.headers.set-cookie'] } })
 
 await app.register(cors, { origin: env.WEB_ORIGIN, credentials: true })
 await app.register(sensible)

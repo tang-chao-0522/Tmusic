@@ -5,8 +5,42 @@ import { isAuthenticatedNeteaseAccount, type NeteaseProvider } from '../provider
 import { getNeteaseCookie, hasNeteaseCredential, removeNeteaseCookie, saveNeteaseCookie } from '../services/credentialService'
 
 const checkSchema = z.object({ key: z.string().min(8).max(256) })
+const phoneSchema = z.object({ phone: z.string().regex(/^1[3-9]\d{9}$/) }).strict()
+const phoneLoginSchema = phoneSchema.extend({ captcha: z.string().regex(/^\d{4,8}$/) })
+const captchaSentAt = new Map<string, number>()
 
 export const neteaseAuthRoutes: FastifyPluginAsync<{ provider: NeteaseProvider }> = async (app, options) => {
+  app.post('/auth/netease/phone/captcha', async (request, reply) => {
+    const parsed = phoneSchema.safeParse(request.body)
+    if (!parsed.success) return fail(reply, request, 422, 'VALIDATION_ERROR', '请输入有效的中国大陆手机号')
+    const key = `${request.ip}:${parsed.data.phone}`
+    const now = Date.now()
+    if (now - (captchaSentAt.get(key) ?? 0) < 60_000) return fail(reply, request, 429, 'CAPTCHA_RATE_LIMITED', '请等待 60 秒后重试')
+    try {
+      const result = await options.provider.sendPhoneCaptcha(parsed.data.phone)
+      if (result.code !== 200) return fail(reply, request, 502, 'NETEASE_CAPTCHA_FAILED', result.message || '验证码发送失败', true)
+      captchaSentAt.set(key, now)
+      for (const [entry, sentAt] of captchaSentAt) if (now - sentAt > 60_000) captchaSentAt.delete(entry)
+      return ok(request, { sent: true, retryAfterSeconds: 60 })
+    } catch { return fail(reply, request, 502, 'NETEASE_CAPTCHA_FAILED', '验证码发送失败，请稍后重试', true) }
+  })
+
+  app.post('/auth/netease/phone/login', async (request, reply) => {
+    const parsed = phoneLoginSchema.safeParse(request.body)
+    if (!parsed.success) return fail(reply, request, 422, 'VALIDATION_ERROR', '手机号或验证码格式不正确')
+    try {
+      const result = await options.provider.loginWithPhoneCaptcha(parsed.data.phone, parsed.data.captcha)
+      if (result.code !== 200 || !result.cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_FAILED', result.message || '登录失败，请检查验证码')
+      const identity = await options.provider.userAccount(result.cookie)
+      if (!isAuthenticatedNeteaseAccount(identity.account)) return fail(reply, request, 401, 'NETEASE_ANONYMOUS_ACCOUNT', '未能确认网易云音乐账号，请重试')
+      await saveNeteaseCookie(actorFrom(request), result.cookie)
+      return ok(request, { authenticated: true, profile: { nickname: identity.profile?.nickname ?? null } })
+    } catch (error) {
+      request.log.warn({ err: error }, 'Netease phone login failed')
+      return fail(reply, request, 502, 'NETEASE_LOGIN_UNAVAILABLE', '暂时无法登录，请稍后重试', true)
+    }
+  })
+
   app.get('/providers/netease/health', async (request, reply) => {
     try {
       return ok(request, await options.provider.health())
