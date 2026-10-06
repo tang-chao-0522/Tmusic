@@ -18,7 +18,7 @@ services:
     #   DOMAIN: ${DOMAIN:?请设置域名}
     ports:
       - "80:80"
-      # - "443:443"
+      - "443:443"
     volumes:
       - caddy_data:/data
       - caddy_config:/config

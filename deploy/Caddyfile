@@ -1,4 +1,4 @@
-:80 {
+tmusic.site {
     encode gzip
 
     @backend path /api/* /realtime /realtime/*
@@ -11,4 +11,8 @@
         try_files {path} /index.html
         file_server
     }
+}
+
+www.tmusic.site {
+    redir https://tmusic.site{uri} permanent
 }
