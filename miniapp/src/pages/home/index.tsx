@@ -1,32 +1,96 @@
 import Taro, { useDidShow } from '@tarojs/taro'
-import { Image, ScrollView, Text, View } from '@tarojs/components'
-import { useState } from 'react'
+import { Image, Text, View } from '@tarojs/components'
+import { useEffect, useRef, useState } from 'react'
 import type { TrackRef } from '@tmusic/contracts'
 import { catalogHome, type HomeData } from '../../lib/api'
 import { usePlayer } from '../../lib/player'
-import { Button, Card, HERO, MiniPlayer, Notice, Page, TrackRow } from '../../components/ui'
+import { Page } from '../../components/ui'
+import background from '../../assets/aurora-home-v2.jpg'
+import './index.scss'
+
+const destinations = [
+  { icon: 'pair', title: '一起听歌', subtitle: 'ふたりで聴く', path: '/pages/together/index' },
+  { icon: 'ai', title: 'AI心情电台', subtitle: 'AIムードラジオ', path: '/pages/ai/index' },
+  { icon: 'profile', title: '我的音乐', subtitle: 'マイライブラリ', path: '/pages/library/index' },
+]
 
 export default function Home() {
   const [data, setData] = useState<HomeData | null>(null)
   const [error, setError] = useState('')
-  const [pick, setPick] = useState(0)
-  const play = usePlayer(s => s.play)
-  const load = () => { catalogHome().then(setData).catch(e => setError(e.message)) }
-  useDidShow(() => { load() })
-  const tracks = data?.recommendations || []
-  const selected: TrackRef | undefined = tracks[pick % Math.max(tracks.length, 1)] || data?.hero
-  return <Page active="/pages/home/index" theme="dark"><ScrollView scrollY className="page-scroll home-scroll">
-    <View className="hero"><Image src={HERO} mode="aspectFill" className="hero-image" /><View className="hero-shade" />
-      <View className="hero-top"><Text className="script-logo">Aurora</Text><Text className="search-link" onClick={() => Taro.navigateTo({ url: '/pages/search/index' })}>⌕</Text></View>
-      <View className="hero-intro"><Text className="hero-tag">A LITTLE LIGHT FOR YOUR DAY</Text><Text className="hero-title">让音乐陪你，{ '\n' }走过每一个闪光的日子。</Text></View>
-      <View className="hero-bottom"><Text>✦　 此刻，听见属于你的光</Text><Button onClick={() => { if (data?.hero) { void play(data.hero, tracks); Taro.navigateTo({ url: '/pages/player/index' }) } }}>▶ 开始聆听</Button></View>
+  const [pressedButton, setPressedButton] = useState<string | null>(null)
+  const animationTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const navigationPending = useRef(false)
+  const { current, playing, play, toggle } = usePlayer()
+
+  useEffect(() => () => {
+    if (animationTimer.current) clearTimeout(animationTimer.current)
+    if (navigationTimer.current) clearTimeout(navigationTimer.current)
+  }, [])
+
+  const load = () => catalogHome().then(result => { setData(result); setError('') }).catch(cause => setError(cause instanceof Error ? cause.message : '音乐暂时无法加载'))
+  useDidShow(() => { void load() })
+
+  const recommendations = data?.recommendations.length ? data.recommendations : data?.guessYouLike.length ? data.guessYouLike : data?.quickPicks.length ? data.quickPicks : data?.hero ? [data.hero] : []
+  const featured = current || recommendations[0] || null
+
+  function playFeatured() {
+    if (!featured) { Taro.showToast({ title: '音乐加载中，请稍后重试', icon: 'none' }); return }
+    if (current?.sourceId === featured.sourceId) toggle()
+    else void play(featured, recommendations)
+  }
+
+  function animateButton(button: string) {
+    if (animationTimer.current) clearTimeout(animationTimer.current)
+    setPressedButton(button)
+    animationTimer.current = setTimeout(() => setPressedButton(null), 600)
+  }
+
+  function startListening() {
+    animateButton('listen')
+    if (current) { toggle(); return }
+    if (!recommendations.length) { void load(); Taro.showToast({ title: '正在寻找推荐歌曲', icon: 'none' }); return }
+    const selected: TrackRef = recommendations[Math.floor(Math.random() * recommendations.length)]!
+    void play(selected, recommendations)
+  }
+
+  function openShortcut(path: string, icon: string) {
+    if (navigationPending.current) return
+    navigationPending.current = true
+    animateButton(icon)
+    navigationTimer.current = setTimeout(() => {
+      void Taro.navigateTo({ url: path }).then(
+        () => { navigationPending.current = false },
+        () => { navigationPending.current = false },
+      )
+    }, 360)
+  }
+
+  return <Page active="/pages/home/index" theme="dark"><View className="aurora-home">
+    <Image className="aurora-home-image" src={background} mode="aspectFill" />
+    <View className="aurora-home-wash" />
+    <View className="aurora-home-inner">
+      <View className="aurora-home-heading">
+        <View className="aurora-home-brand-row"><Text className="aurora-home-brand">Aurora</Text><View className="aurora-home-search" onClick={() => Taro.navigateTo({ url: '/pages/search/index' })}><View className="aurora-search-ring" /><View className="aurora-search-handle" /></View></View>
+        <Text className="aurora-home-copy">让音乐陪你，{'\n'}走过每一个闪光的日子。</Text>
+      </View>
+
+      <View className="aurora-home-lower">
+        <View className="aurora-glass-player">
+          <View className="aurora-player-info" onClick={() => { if (current) Taro.navigateTo({ url: '/pages/player/index' }); else playFeatured() }}>
+            <Image className="aurora-player-art" src={featured?.coverUrl || background} mode="aspectFill" />
+            <View className="aurora-player-copy"><Text className="aurora-player-title">{featured?.name || '正在寻找你的旋律'}</Text><Text className="aurora-player-artist">{featured?.artists.map(artist => artist.name).join(' / ') || 'Aurora Music'}</Text></View>
+          </View>
+          <View className="aurora-player-action" hoverClass="aurora-player-action-pressed" onClick={playFeatured}><Text>{current && playing ? 'Ⅱ' : '▶'}</Text></View>
+        </View>
+
+        <View className="aurora-home-poem"><Text>有些时间，</Text><Text>只有音乐能听懂。</Text></View>
+
+        <View className={`aurora-listen ${playing ? 'is-playing' : ''} ${pressedButton === 'listen' ? 'is-pressed' : ''}`} onClick={startListening}><View className="aurora-listen-ripple" /><View className="aurora-listen-ripple aurora-listen-ripple-late" /><View className="aurora-listen-halo"><View className="aurora-listen-core"><Text className="aurora-listen-play">{playing ? 'Ⅱ' : '▶'}</Text><Text className="aurora-listen-label">{playing ? '暂停听歌' : current ? '继续听歌' : '开始听歌'}</Text><Text className="aurora-listen-subtitle">与好音乐相遇</Text></View></View></View>
+
+        <View className="aurora-shortcuts">{destinations.map(item => <View className={`aurora-shortcut ${pressedButton === item.icon ? 'is-pressed' : ''}`} key={item.path} onClick={() => openShortcut(item.path, item.icon)}><View className="aurora-shortcut-circle"><View className={`aurora-shortcut-glyph aurora-glyph-${item.icon}`}><View className="aurora-glyph-head" /><View className="aurora-glyph-body" /></View></View><Text className="aurora-shortcut-title">{item.title}</Text><Text className="aurora-shortcut-subtitle">{item.subtitle}</Text></View>)}</View>
+        {error && <Text className="aurora-home-error" onClick={() => void load()}>{error} · 点击重试</Text>}
+      </View>
     </View>
-    <View className="home-content"><View className="section-heading"><View><Text className="eyebrow">FOR YOU</Text><Text className="heading">今天的心动旋律</Text></View><Text className="link" onClick={() => Taro.navigateTo({ url: '/pages/search/index' })}>探索更多 ›</Text></View>
-      {error ? <Notice text={error} retry={load} /> : !data ? <Notice text="正在寻找你的音乐…" /> : null}
-      {selected && <Card className="featured-card"><View className="featured-art" onClick={() => { void play(selected, tracks); Taro.navigateTo({ url: '/pages/player/index' }) }}><Image src={selected.coverUrl || HERO} mode="aspectFill" /><View className="featured-overlay"><Text>♫  每日精选</Text><Text className="featured-title">{selected.name}</Text><Text>{selected.artists[0]?.name}</Text></View></View><View className="featured-footer"><Text>一首歌，刚好写下今天的心情</Text><Text onClick={() => setPick(pick + 1)}>换一首 ↻</Text></View></Card>}
-      <View className="section-heading"><View><Text className="eyebrow">YOUR PLAYLIST</Text><Text className="heading">猜你喜欢</Text></View></View>
-      {(data?.guessYouLike || []).slice(0, 4).map(track => <TrackRow key={track.sourceId} track={track} queue={data?.guessYouLike} />)}
-      <Card className="invite-card" ><Text className="eyebrow">LISTEN TOGETHER</Text><Text className="heading">把此刻的心动，分享给 TA</Text><Text>同一首歌，同一个心跳频率。</Text><Button small onClick={() => Taro.redirectTo({ url: '/pages/together/index' })}>开启一起听歌 →</Button></Card>
-    </View>
-  </ScrollView><MiniPlayer /></Page>
+  </View></Page>
 }

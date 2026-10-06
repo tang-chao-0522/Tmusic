@@ -8,11 +8,11 @@ module.exports = {
   sourceRoot: 'src',
   outputRoot: 'dist',
   framework: 'react',
-  compiler: 'webpack5',
+  compiler: { type: 'webpack5', prebundle: { enable: false } },
   plugins: [],
   alias: { '@': path.resolve(__dirname, '..', 'src') },
   defineConstants: {
-    __API_URL__: JSON.stringify(process.env.TARO_APP_API_URL || 'https://example.com/api/v1'),
+    __API_URL__: JSON.stringify(process.env.TARO_APP_API_URL || 'http://127.0.0.1:4100/api/v1'),
   },
   mini: { postcss: { autoprefixer: { enable: true }, pxtransform: { enable: true, config: {} } } },
 }

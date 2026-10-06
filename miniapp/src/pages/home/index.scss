@@ -1,0 +1,128 @@
+.aurora-home {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #fff;
+  background: #202445;
+}
+
+.aurora-home-image,
+.aurora-home-wash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.aurora-home-wash {
+  background: linear-gradient(180deg, rgba(61, 70, 140, .1) 0%, transparent 24%, rgba(27, 25, 73, .08) 44%, rgba(19, 18, 53, .38) 65%, rgba(12, 14, 42, .84) 100%);
+}
+
+.aurora-home-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 150px 45px 36px;
+  padding-bottom: calc(36px + env(safe-area-inset-bottom));
+}
+
+.aurora-home-heading { width: 100%; }
+.aurora-home-brand-row { display: flex; align-items: center; justify-content: space-between; }
+.aurora-home-brand {
+  display: block;
+  color: #151b49;
+  font-family: 'Brush Script MT', 'Segoe Script', cursive;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 76px;
+  line-height: 1.15;
+  transform: rotate(-6deg);
+  text-shadow: 2px 2px 0 rgba(255, 192, 232, .85), 0 4px 14px rgba(255, 231, 246, .55);
+}
+.aurora-home-search { position: relative; width: 62px; height: 62px; margin-right: 6px; }
+.aurora-search-ring { position: absolute; top: 9px; left: 7px; width: 35px; height: 35px; border: 4px solid #a6d7ff; border-radius: 50%; box-shadow: 0 0 6px #fff, inset 0 0 4px #fff; }
+.aurora-search-handle { position: absolute; width: 27px; height: 4px; left: 35px; top: 42px; background: #a6d7ff; border-radius: 10px; transform: rotate(-49deg); box-shadow: 0 0 6px #fff; }
+.aurora-home-copy {
+  display: block;
+  margin: 15px 0 0 9px;
+  color: #20255b;
+  font-size: 29px;
+  font-weight: 800;
+  line-height: 1.53;
+  white-space: pre-line;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 8px #fff5f5a8;
+}
+
+.aurora-home-lower { display: flex; flex-direction: column; align-items: center; margin-top: auto; width: 100%; }
+.aurora-glass-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  min-height: 128px;
+  padding: 13px 17px 13px 16px;
+  border: 2px solid rgba(243, 235, 255, .82);
+  border-radius: 76px;
+  background: linear-gradient(135deg, rgba(233, 222, 255, .44), rgba(80, 84, 142, .5) 56%, rgba(233, 209, 255, .22));
+  box-shadow: inset 0 0 16px rgba(255, 255, 255, .38), 0 11px 30px rgba(13, 13, 56, .26), 0 0 20px rgba(242, 198, 255, .23);
+  backdrop-filter: blur(21px);
+}
+.aurora-player-info { display: flex; align-items: center; flex: 1; min-width: 0; gap: 18px; }
+.aurora-player-art { width: 94px; height: 94px; flex: none; border-radius: 25px; border: 2px solid rgba(255,255,255,.6); }
+.aurora-player-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 7px; text-shadow: 0 1px 5px #12153288; }
+.aurora-player-title { display: block; font-size: 26px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aurora-player-artist { display: block; font-size: 20px; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aurora-player-action { display: flex; align-items: center; justify-content: center; flex: none; width: 69px; height: 69px; color: #303c76; background: #fff; border-radius: 50%; font-size: 31px; box-shadow: 0 3px 14px rgba(17, 19, 60, .42); }
+.aurora-player-action text { transform: translateX(2px); }
+.aurora-player-action-pressed { transform: scale(.86); box-shadow: 0 0 24px 8px rgba(255, 230, 255, .8); }
+
+.aurora-home-poem { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 39px; text-align: center; font-size: 25px; font-weight: 700; letter-spacing: 3px; line-height: 1.35; text-shadow: 0 2px 10px #060825; }
+.aurora-listen { position: relative; margin-top: 42px; border-radius: 50%; }
+.aurora-listen-ripple { position: absolute; inset: -18px; border: 3px solid rgba(239, 211, 255, .95); border-radius: 50%; opacity: 0; pointer-events: none; }
+.aurora-listen.is-playing .aurora-listen-ripple { animation: aurora-listen-wave 2.1s ease-out infinite; }
+.aurora-listen.is-playing .aurora-listen-ripple-late { animation-delay: 1.05s; }
+.aurora-listen.is-pressed .aurora-listen-ripple:first-child { animation: aurora-listen-wave .6s ease-out both; }
+.aurora-listen.is-pressed .aurora-listen-halo { animation: aurora-listen-tap .5s ease-out; }
+.aurora-listen-halo { display: flex; align-items: center; justify-content: center; width: 196px; height: 196px; border: 4px solid rgba(242, 211, 255, .98); border-radius: 50%; background: rgba(178, 122, 255, .38); box-shadow: 0 0 0 8px rgba(159, 110, 255, .22), 0 0 36px 14px rgba(185, 114, 255, .8), inset 0 0 16px #fff; }
+.aurora-listen-core { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 160px; height: 160px; border-radius: 50%; color: #38347e; background: radial-gradient(circle at 50% 28%, #fff, #f8eaff 48%, #dab9ff 100%); box-shadow: inset 0 -7px 16px #b18edbaa, 0 3px 12px #24105d66; }
+.aurora-listen-play { font-size: 46px; line-height: 1; }
+.aurora-listen:not(.is-playing) .aurora-listen-play { transform: translateX(5px); }
+.aurora-listen-label { margin-top: 6px; font-size: 24px; font-weight: 900; letter-spacing: 1px; }
+.aurora-listen-subtitle { margin-top: 3px; font-size: 15px; font-weight: 700; color: #8f73c0; }
+
+.aurora-shortcuts { display: flex; justify-content: space-around; align-items: start; width: 100%; margin-top: 52px; }
+.aurora-shortcut { display: flex; flex-direction: column; align-items: center; width: 33.33%; text-align: center; }
+.aurora-shortcut-circle { position: relative; display: flex; align-items: center; justify-content: center; width: 80px; height: 80px; border: 4px solid #d5b6ff; border-radius: 50%; color: #6955df; background: radial-gradient(circle at 40% 25%, #fff, #f7eaff 70%, #ddc0ff); box-shadow: 0 0 18px #c488ff, inset 0 0 6px #fff; }
+.aurora-shortcut-circle::after { content: ''; position: absolute; inset: -6px; border: 3px solid currentColor; border-radius: 50%; opacity: 0; pointer-events: none; }
+.aurora-shortcut.is-pressed .aurora-shortcut-circle { animation: aurora-shortcut-pop .5s ease-out; }
+.aurora-shortcut.is-pressed .aurora-shortcut-circle::after { animation: aurora-shortcut-wave .55s ease-out; }
+.aurora-shortcut.is-pressed .aurora-shortcut-glyph { animation: aurora-shortcut-bounce .5s ease-out; }
+.aurora-shortcut:nth-child(2) .aurora-shortcut-circle { color: #d94fc4; border-color: #f7b5ec; }
+.aurora-shortcut:nth-child(3) .aurora-shortcut-circle { color: #c94ab2; border-color: #edb8ec; }
+.aurora-shortcut-glyph { position: relative; width: 48px; height: 48px; }
+.aurora-glyph-pair .aurora-glyph-head::before,
+.aurora-glyph-pair .aurora-glyph-head::after { content: ''; position: absolute; top: 8px; width: 15px; height: 15px; border: 4px solid currentColor; border-radius: 50%; }
+.aurora-glyph-pair .aurora-glyph-head::before { left: 4px; }.aurora-glyph-pair .aurora-glyph-head::after { right: 4px; }
+.aurora-glyph-pair .aurora-glyph-body::before,
+.aurora-glyph-pair .aurora-glyph-body::after { content: ''; position: absolute; bottom: 5px; width: 23px; height: 14px; border: 4px solid currentColor; border-bottom: 0; border-radius: 18px 18px 0 0; }
+.aurora-glyph-pair .aurora-glyph-body::before { left: 0; }.aurora-glyph-pair .aurora-glyph-body::after { right: 0; }
+.aurora-glyph-ai .aurora-glyph-head { position: absolute; top: 13px; left: 6px; width: 36px; height: 29px; border: 4px solid currentColor; border-radius: 10px; }
+.aurora-glyph-ai .aurora-glyph-head::before { content: ''; position: absolute; top: 8px; left: 7px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 13px 0 currentColor; }
+.aurora-glyph-ai .aurora-glyph-head::after { content: ''; position: absolute; bottom: 5px; left: 9px; width: 12px; height: 5px; border-bottom: 3px solid currentColor; border-radius: 0 0 10px 10px; }
+.aurora-glyph-ai .aurora-glyph-body { position: absolute; top: 3px; left: 23px; height: 11px; border-left: 4px solid currentColor; }
+.aurora-glyph-ai .aurora-glyph-body::before { content: ''; position: absolute; top: -4px; left: -6px; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.aurora-glyph-profile .aurora-glyph-head { position: absolute; top: 5px; left: 15px; width: 18px; height: 18px; border: 4px solid currentColor; border-radius: 50%; }
+.aurora-glyph-profile .aurora-glyph-body { position: absolute; bottom: 5px; left: 5px; width: 38px; height: 19px; border: 4px solid currentColor; border-radius: 21px 21px 9px 9px; }
+.aurora-shortcut-title { margin-top: 12px; font-size: 21px; font-weight: 800; line-height: 1.3; text-shadow: 0 2px 8px #080a29; }
+.aurora-shortcut-subtitle { margin-top: 2px; font-size: 15px; line-height: 1.2; color: #e5d9ff; text-shadow: 0 2px 7px #080a29; }
+.aurora-home-error { position: absolute; bottom: 15px; left: 0; right: 0; display: block; color: #ffe8f5; font-size: 17px; text-align: center; text-shadow: 0 2px 7px #080a29; }
+
+@keyframes aurora-listen-wave { 0% { opacity: .85; transform: scale(.78); } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes aurora-listen-tap { 0%, 100% { transform: scale(1); } 35% { transform: scale(.91); } 70% { transform: scale(1.07); } }
+@keyframes aurora-shortcut-pop { 0%, 100% { transform: scale(1); } 32% { transform: scale(.83); } 70% { transform: scale(1.16); } }
+@keyframes aurora-shortcut-wave { 0% { opacity: .8; transform: scale(.75); } 100% { opacity: 0; transform: scale(1.55); } }
+@keyframes aurora-shortcut-bounce { 0%, 100% { transform: translateY(0); } 52% { transform: translateY(-7px); } }

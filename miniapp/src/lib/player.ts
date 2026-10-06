@@ -1,6 +1,7 @@
 import Taro from '@tarojs/taro'
 import type { TrackRef } from '@tmusic/contracts'
-import { create } from 'zustand'
+import { useSyncExternalStore } from 'react'
+import { createStore } from 'zustand/vanilla'
 import { resolve } from './api'
 
 type Player = {
@@ -23,7 +24,7 @@ function engine() {
   }
   return audio
 }
-export const usePlayer = create<Player>((set, get) => ({
+const playerStore = createStore<Player>((set, get) => ({
   queue: [], current: null, playing: false, progress: 0, duration: 0, shuffle: false, repeat: false, error: '',
   play: async (track, queue) => {
     const token = ++playToken
@@ -45,3 +46,20 @@ export const usePlayer = create<Player>((set, get) => ({
   toggleShuffle: () => set({ shuffle: !get().shuffle }),
   toggleRepeat: () => set({ repeat: !get().repeat }),
 }))
+
+type UsePlayer = {
+  (): Player
+  <T>(selector: (state: Player) => T): T
+  getState: typeof playerStore.getState
+  setState: typeof playerStore.setState
+}
+
+export const usePlayer = Object.assign(
+  function usePlayer<T>(selector?: (state: Player) => T) {
+    return useSyncExternalStore(
+      playerStore.subscribe,
+      () => selector ? selector(playerStore.getState()) : playerStore.getState(),
+    )
+  },
+  { getState: playerStore.getState, setState: playerStore.setState },
+) as UsePlayer

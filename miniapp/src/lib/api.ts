@@ -16,9 +16,9 @@ export function actorId() {
   return id
 }
 
-export async function api<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: unknown): Promise<T> {
+export async function apiEnvelope<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: unknown): Promise<{ data: T; meta: Record<string, unknown> }> {
   const cookie = Taro.getStorageSync('tmusic:room-cookie') as string
-  const response = await Taro.request<{ data?: T; error?: { message: string } }>({
+  const response = await Taro.request<{ data?: T; meta?: Record<string, unknown>; error?: { message: string } }>({
     url: `${__API_URL__}${path}`,
     method,
     data,
@@ -26,16 +26,25 @@ export async function api<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DEL
   })
   const setCookie = response.header?.['Set-Cookie'] || response.header?.['set-cookie']
   if (setCookie) Taro.setStorageSync('tmusic:room-cookie', String(setCookie).split(';')[0])
-  if (response.statusCode === 204) return undefined as T
+  if (response.statusCode === 204) return { data: undefined as T, meta: response.data?.meta ?? {} }
   if (response.statusCode < 200 || response.statusCode >= 300 || response.data?.data === undefined) {
     throw new Error(response.data?.error?.message || `请求失败 (${response.statusCode})`)
   }
-  return response.data.data
+  return { data: response.data.data, meta: response.data.meta ?? {} }
+}
+
+export async function api<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: unknown): Promise<T> {
+  return (await apiEnvelope<T>(path, method, data)).data
 }
 
 export const catalogHome = () => api<HomeData>('/catalog/home')
 export const search = (q: string, type: 'song' | 'playlist' | 'artist' | 'album' = 'song') => api<{ items: Array<TrackRef | Playlist | Artist | Album>; degraded: boolean }>(`/catalog/search?q=${encodeURIComponent(q)}&type=${type}&limit=30`)
 export const library = (type: LibraryKind) => api<{ items: Array<TrackRef | Playlist | Artist | Album> }>(`/me/library?type=${type}`)
+export async function likedTracksPage(offset = 0, limit = 24) {
+  const { data, meta } = await apiEnvelope<{ items: TrackRef[] }>(`/me/library?type=liked&offset=${offset}&limit=${limit}`)
+  const nextOffset = meta.nextCursor == null ? null : Number(meta.nextCursor)
+  return { items: data.items, total: Number(meta.total ?? data.items.length), nextOffset: nextOffset !== null && Number.isSafeInteger(nextOffset) ? nextOffset : null }
+}
 export const playlistTracks = (id: string) => api<{ playlist: Playlist; tracks: TrackRef[] }>(`/me/playlists/${encodeURIComponent(id)}/tracks`)
 export const createPlaylist = (name: string) => api<{ id: string }>('/me/playlists', 'POST', { name })
 export const addToPlaylist = (id: string, sourceId: string) => api(`/me/playlists/${encodeURIComponent(id)}/tracks`, 'POST', { sourceId })
