@@ -5,6 +5,7 @@
   "workspaces": [
     "frontend",
     "backend",
+    "miniapp",
     "packages/*"
   ],
   "scripts": {
@@ -12,6 +13,9 @@
     "dev": "concurrently -n netease,api,web -c yellow,cyan,magenta \"npm run dev:netease\" \"npm run dev -w @tmusic/api\" \"npm run dev -w @tmusic/web\"",
     "dev:app": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @tmusic/api\" \"npm run dev -w @tmusic/web\"",
     "dev:web": "npm run dev -w @tmusic/web",
+    "predev:mini": "npm run build -w @tmusic/contracts",
+    "dev:mini": "npm run dev:weapp -w @tmusic/miniapp",
+    "build:mini": "npm run build:weapp -w @tmusic/miniapp",
     "dev:api": "npm run dev -w @tmusic/api",
     "dev:netease": "npx --yes NeteaseCloudMusicApi@4.32.0",
     "build": "npm run build -w @tmusic/contracts && npm run build -w @tmusic/api && npm run build -w @tmusic/web",
