@@ -2,7 +2,9 @@ import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { actorFrom, fail, ok } from '../lib/http'
 import { isAuthenticatedNeteaseAccount, type NeteaseProvider } from '../providers/neteaseProvider'
-import { getNeteaseCookie, hasNeteaseCredential, removeNeteaseCookie, saveNeteaseCookie } from '../services/credentialService'
+import { credentialMatchesAccount, getNeteaseCookie, hasNeteaseCredential, removeNeteaseCookie, saveNeteaseCookie } from '../services/credentialService'
+import { aiSessionCookie, clearAiSessionCookie, createAiSession } from '../security/aiSession'
+import { env } from '../config/env'
 
 const checkSchema = z.object({ key: z.string().min(8).max(256) })
 const phoneSchema = z.object({ phone: z.string().regex(/^1[3-9]\d{9}$/) }).strict()
@@ -10,6 +12,26 @@ const phoneLoginSchema = phoneSchema.extend({ captcha: z.string().regex(/^\d{4,8
 const captchaSentAt = new Map<string, number>()
 
 export const neteaseAuthRoutes: FastifyPluginAsync<{ provider: NeteaseProvider }> = async (app, options) => {
+  app.post('/auth/netease/ai-session', async (request, reply) => {
+    if (request.headers.origin && request.headers.origin !== env.WEB_ORIGIN) return fail(reply, request, 403, 'ORIGIN_FORBIDDEN', '请求来源不合法')
+    if (env.NODE_ENV === 'production' && !env.AI_SESSION_SECRET) return fail(reply, request, 503, 'AI_SESSION_SECRET_MISSING', 'AI 会话密钥尚未配置')
+    const ownerId = actorFrom(request)
+    const cookie = await getNeteaseCookie(ownerId)
+    if (!cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_REQUIRED', '请先连接网易云音乐账号')
+    try {
+      const identity = await options.provider.userAccount(cookie)
+      if (!isAuthenticatedNeteaseAccount(identity.account)) return fail(reply, request, 401, 'NETEASE_LOGIN_EXPIRED', '网易云登录已失效，请重新连接')
+      const accountId = String(identity.account!.id)
+      if (!(await credentialMatchesAccount(ownerId, accountId))) await saveNeteaseCookie(ownerId, cookie, accountId)
+      reply.header('Cache-Control', 'no-store')
+      reply.header('Set-Cookie', aiSessionCookie(createAiSession(accountId, ownerId)))
+      return ok(request, { authenticated: true })
+    } catch (error) {
+      request.log.warn({ err: error }, 'Netease AI session renewal failed')
+      return fail(reply, request, 502, 'NETEASE_ACCOUNT_UNAVAILABLE', '暂时无法验证网易云登录状态', true)
+    }
+  })
+
   app.post('/auth/netease/phone/captcha', async (request, reply) => {
     const parsed = phoneSchema.safeParse(request.body)
     if (!parsed.success) return fail(reply, request, 422, 'VALIDATION_ERROR', '请输入有效的中国大陆手机号')
@@ -33,7 +55,8 @@ export const neteaseAuthRoutes: FastifyPluginAsync<{ provider: NeteaseProvider }
       if (result.code !== 200 || !result.cookie) return fail(reply, request, 401, 'NETEASE_LOGIN_FAILED', result.message || '登录失败，请检查验证码')
       const identity = await options.provider.userAccount(result.cookie)
       if (!isAuthenticatedNeteaseAccount(identity.account)) return fail(reply, request, 401, 'NETEASE_ANONYMOUS_ACCOUNT', '未能确认网易云音乐账号，请重试')
-      await saveNeteaseCookie(actorFrom(request), result.cookie)
+      await saveNeteaseCookie(actorFrom(request), result.cookie, String(identity.account!.id))
+      if (env.NODE_ENV !== 'production' || env.AI_SESSION_SECRET) reply.header('Set-Cookie', aiSessionCookie(createAiSession(String(identity.account!.id), actorFrom(request))))
       return ok(request, { authenticated: true, profile: { nickname: identity.profile?.nickname ?? null } })
     } catch (error) {
       request.log.warn({ err: error }, 'Netease phone login failed')
@@ -68,7 +91,8 @@ export const neteaseAuthRoutes: FastifyPluginAsync<{ provider: NeteaseProvider }
         if (!isAuthenticatedNeteaseAccount(identity.account)) {
           return fail(reply, request, 401, 'NETEASE_ANONYMOUS_ACCOUNT', '扫码凭据未关联网易云账号，请在网易云音乐 App 中确认登录后重试')
         }
-        await saveNeteaseCookie(actorFrom(request), result.cookie)
+        await saveNeteaseCookie(actorFrom(request), result.cookie, String(identity.account!.id))
+        if (env.NODE_ENV !== 'production' || env.AI_SESSION_SECRET) reply.header('Set-Cookie', aiSessionCookie(createAiSession(String(identity.account!.id), actorFrom(request))))
       }
       return ok(request, { code: result.code, message: result.message ?? '', authenticated: result.code === 803 })
     } catch (error) {
@@ -146,10 +170,11 @@ export const neteaseAuthRoutes: FastifyPluginAsync<{ provider: NeteaseProvider }
         delete headers['content-type']
       }
     },
-  }, async (request) => {
+  }, async (request, reply) => {
     const userId = actorFrom(request)
     const cookie = await getNeteaseCookie(userId)
     await removeNeteaseCookie(userId)
+    reply.header('Set-Cookie', clearAiSessionCookie())
     if (cookie) await options.provider.logout(cookie).catch(() => undefined)
     return ok(request, { authenticated: false })
   })

@@ -40,6 +40,12 @@ services:
       NETEASE_API_URL: http://netease-api:3000
       ROOM_SESSION_SECRET: ${ROOM_SESSION_SECRET:?请设置房间密钥}
       CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?请设置加密密钥}
+      AI_SESSION_SECRET: ${AI_SESSION_SECRET:?请设置AI会话密钥}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_DATA_PATH: /app/backend/.local/agent.sqlite
+    volumes:
+      - agent_data:/app/backend/.local
     depends_on:
       mongo:
         condition: service_healthy
@@ -101,3 +107,4 @@ volumes:
   redis_data:
   caddy_data:
   caddy_config:
+  agent_data:

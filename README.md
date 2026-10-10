@@ -1,5 +1,7 @@
 # TMusic
 
+AI Agent 首版接入、独立模型配置与运行条件见 [`docs/08-agent-implementation.md`](docs/08-agent-implementation.md)。
+
 面向个人学习的音乐播放器工程，包含网易云 Provider、个人音乐库、一起听、双来源评论和 AI 对话入口。
 
 ## 工程结构

@@ -10,6 +10,9 @@ const envSchema = z.object({
   NETEASE_COOKIE: z.string().optional(),
   CREDENTIAL_ENCRYPTION_KEY: z.string().optional(),
   ROOM_SESSION_SECRET: z.string().optional(),
+  AI_SESSION_SECRET: z.string().optional(),
+  AI_MODEL_CONFIG_PATH: z.string().optional(),
+  AI_DATA_PATH: z.string().optional(),
 })
 
 export const env = envSchema.parse(process.env)
