@@ -6,6 +6,7 @@ const externalCredentialSchema = new Schema(
   {
     userId: { type: String, required: true, index: true },
     provider: { type: String, required: true },
+    accountId: { type: String },
     ciphertext: { type: String, required: true },
     iv: { type: String, required: true },
     authTag: { type: String, required: true },

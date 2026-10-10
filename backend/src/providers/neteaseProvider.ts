@@ -247,6 +247,23 @@ export class NeteaseProvider implements MusicProvider {
     return { items, total: Number(result.artistCount ?? offset + items.length) }
   }
 
+  async getTrackDetail(sourceId: string): Promise<TrackRef | null> {
+    if (!/^\d+$/.test(sourceId)) return null
+    const payload = await this.json<{ code?: number; songs?: Array<Record<string, any>> }>(`/song/detail?ids=${encodeURIComponent(sourceId)}`)
+    if (payload.code !== 200) throw new Error(`Netease track detail returned code ${payload.code}`)
+    const song = payload.songs?.find((item) => String(item.id) === sourceId)
+    return song ? this.normalizeTrack(song) : null
+  }
+
+  async getTrackDetails(sourceIds: string[]): Promise<TrackRef[]> {
+    const ids = [...new Set(sourceIds)]
+    if (!ids.length || ids.length > 30 || ids.some((id) => !/^\d+$/.test(id))) throw new Error('Invalid song IDs')
+    const payload = await this.json<{ code?: number; songs?: Array<Record<string, any>> }>(`/song/detail?ids=${encodeURIComponent(ids.join(','))}`)
+    if (payload.code !== 200) throw new Error(`Netease track details returned code ${payload.code}`)
+    const byId = new Map((payload.songs ?? []).map((song) => [String(song.id), this.normalizeTrack(song)]))
+    return ids.flatMap((id) => { const track = byId.get(id); return track ? [track] : [] })
+  }
+
   async getUserLibrary(type: 'playlist' | 'liked' | 'album' | 'artist', serializedCookie: string) {
     const status = await this.loginStatus(serializedCookie)
     const profile = status.data?.profile ?? status.profile

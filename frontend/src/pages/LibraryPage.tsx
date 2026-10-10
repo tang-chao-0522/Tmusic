@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Disc3, Heart, ListMusic, Music2, Plus, UserRound } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { TrackListItem } from '../components/music/TrackListItem'
 import { GlassPanel } from '../components/shared/GlassPanel'
 import type { DemoTrack } from '../data/tracks'
@@ -15,8 +15,11 @@ const tabs: Array<{ value: LibraryType; label: string; icon: typeof ListMusic }>
 ]
 
 export function LibraryPage() {
-  const [type, setType] = useLibraryTab()
-  const [playlistId, setPlaylistId] = useState<string | null>(null)
+  const [tab, setType] = useLibraryTab()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const playlistId = searchParams.get('playlist')
+  const type: LibraryType = playlistId ? 'playlist' : tab
+  const setPlaylistId = (id: string | null) => setSearchParams(id ? { playlist: id } : {})
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -51,9 +54,9 @@ export function LibraryPage() {
     <nav className="library-tabs" aria-label="音乐库分类">{tabs.map(({ value, label: tabLabel, icon: Icon }) => <button key={value} type="button" className={type === value ? 'active' : ''} onClick={() => { setType(value); setPlaylistId(null) }}><Icon />{tabLabel}</button>)}</nav>
     {account.isPending ? <LibraryMessage text="正在读取网易云登录状态…" /> : null}
     {!account.isPending && !account.data?.authenticated ? <LibraryMessage text="登录后即可同步你的歌单、喜欢的音乐、收藏专辑和关注歌手。"><Link to="/account">连接网易云音乐</Link></LibraryMessage> : null}
-    {account.data?.authenticated && library.isPending ? <LibraryMessage text={`正在同步${label}…`} /> : null}
-    {library.isError ? <LibraryMessage text={library.error.message}><button type="button" onClick={() => void library.refetch()}>重试</button></LibraryMessage> : null}
-    {account.data?.authenticated && type === 'playlist' && !library.isPending && !library.isError ? <section className="personal-library-content">
+    {account.data?.authenticated && !playlistId && library.isPending ? <LibraryMessage text={`正在同步${label}…`} /> : null}
+    {!playlistId && library.isError ? <LibraryMessage text={library.error.message}><button type="button" onClick={() => void library.refetch()}>重试</button></LibraryMessage> : null}
+    {account.data?.authenticated && type === 'playlist' && (playlistId || (!library.isPending && !library.isError)) ? <section className="personal-library-content">
       {playlistId ? <>
         <button className="library-back" type="button" onClick={() => setPlaylistId(null)}>← 返回歌单</button>
         {detail.isPending ? <LibraryMessage text="正在读取歌单歌曲…" /> : detail.isError ? <LibraryMessage text={detail.error.message}><button type="button" onClick={() => void detail.refetch()}>重试</button></LibraryMessage> : <>

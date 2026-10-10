@@ -14,14 +14,19 @@ export async function getNeteaseCookie(userId: string) {
   }
 }
 
-export async function saveNeteaseCookie(userId: string, cookie: string) {
+export async function saveNeteaseCookie(userId: string, cookie: string, accountId?: string) {
   if (!isMongoReady()) throw new Error('MongoDB is required to save credentials')
   const encrypted = encryptCredential(cookie)
   await ExternalCredentialModel.updateOne(
     { userId, provider: 'netease' },
-    { $set: { ...encrypted, keyVersion: 1, lastValidatedAt: new Date() } },
+    { $set: { ...encrypted, ...(accountId ? { accountId } : {}), keyVersion: 1, lastValidatedAt: new Date() } },
     { upsert: true },
   )
+}
+
+export async function credentialMatchesAccount(userId: string, accountId: string) {
+  if (!isMongoReady()) return false
+  return Boolean(await ExternalCredentialModel.exists({ userId, provider: 'netease', accountId }))
 }
 
 export async function removeNeteaseCookie(userId: string) {

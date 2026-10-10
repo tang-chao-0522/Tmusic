@@ -21,7 +21,10 @@ COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/backend/package.json ./backend/package.json
 COPY --from=build /app/backend/dist ./backend/dist
+COPY --from=build /app/backend/config ./backend/config
 COPY --from=build /app/packages ./packages
+
+RUN mkdir -p /app/backend/.local && chown -R node:node /app/backend/.local
 
 USER node
 EXPOSE 4100

@@ -11,6 +11,9 @@
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
+    "@earendil-works/chord": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-durable": "1.1.0",
     "@fastify/cors": "^11.1.0",
     "@fastify/sensible": "^6.0.3",
     "@socket.io/redis-adapter": "^8.3.0",
@@ -25,8 +28,9 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
-    "tsx": "^4.20.6",
     "tsup": "^8.5.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3"
-  }
+  },
+  "engines": { "node": ">=22.19.0" }
 }

@@ -23,7 +23,9 @@ function browserActorId() {
 
 type UiComment = { id: string; user: string; text: string; time: string; likes: number }
 
-async function requestEnvelope<T>(path: string, init?: RequestInit): Promise<{ data: T; meta: Record<string, unknown> }> {
+let aiSessionRenewal: Promise<void> | null = null
+
+async function requestEnvelope<T>(path: string, init?: RequestInit, renewed = false): Promise<{ data: T; meta: Record<string, unknown> }> {
   const headers = new Headers(init?.headers)
   headers.set('x-user-id', browserActorId())
   if (typeof init?.body === 'string' && init.body.length > 0) {
@@ -37,6 +39,19 @@ async function requestEnvelope<T>(path: string, init?: RequestInit): Promise<{ d
     headers,
   })
   const payload = await response.json().catch(() => null)
+  if (!response.ok && path.startsWith('/ai/') && payload?.error?.code === 'AI_LOGIN_REQUIRED' && !renewed) {
+    aiSessionRenewal ??= request<{ authenticated: true }>('/auth/netease/ai-session', { method: 'POST' }).then(() => undefined).finally(() => { aiSessionRenewal = null })
+    try { await aiSessionRenewal }
+    catch (cause) {
+      if (cause instanceof ApiError && (cause.code === 'NETEASE_LOGIN_REQUIRED' || cause.code === 'NETEASE_LOGIN_EXPIRED')) throw new ApiError('AI_LOGIN_REQUIRED', '请先登录网易云账号，再使用音乐助手。')
+      throw cause
+    }
+    try { return await requestEnvelope<T>(path, init, true) }
+    catch (cause) {
+      if (cause instanceof ApiError && cause.code === 'AI_LOGIN_REQUIRED') throw new ApiError('AI_SESSION_COOKIE_UNAVAILABLE', '网易云账号已验证，但 AI 会话 Cookie 未生效；请检查 HTTPS 和浏览器 Cookie 设置。')
+      throw cause
+    }
+  }
   if (!response.ok) throw new ApiError(payload?.error?.code || 'REQUEST_FAILED', payload?.error?.message || `Request failed: ${response.status}`)
   return payload as { data: T; meta: Record<string, unknown> }
 }
@@ -238,6 +253,37 @@ export function getRecentTracks(offset = 0, limit = 30, signal?: AbortSignal) {
 export function disconnectNetease() {
   return request<{ authenticated: false }>('/auth/netease/session', { method: 'DELETE' })
 }
+
+export type AiPlan = { version: number; goal: string; constraints: string[]; assumptions: string[]; missingInformation: string[]; proposedApproach: string; status: string; todos: Array<{ id: string; title: string; acceptance: string; dependsOn: string[]; status: string; evidence: string[] }> }
+export type AiCard = { type: 'track'; track: TrackRef } | { type: 'draft'; draftId: string; name: string; trackCount: number }
+export type AiRun = { id: string; messageId: string; conversationId: string; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'; userText: string; requestedTrackCount: number; wantsPlaylist: boolean; answerText: string; cards: AiCard[]; plan: AiPlan | null; steps: Array<{ id: string; name: string; status: string; todoId?: string | null }>; errorCode?: string; latestSequence: number; createdAt: string }
+export type AiConversation = { id: string; title: string; updatedAt?: string }
+export type AiCustomProvider = 'openai-compatible' | 'anthropic-compatible'
+export type AiModelConfig = { source: 'default'; provider: string; model: string; configured: boolean } | { source: 'custom'; provider: AiCustomProvider; baseUrl: string; model: string; apiKeyMasked: string }
+
+export function getAiModelConfig() { return request<AiModelConfig>('/ai/model-config') }
+export function saveAiModelConfig(value: { provider: AiCustomProvider; baseUrl: string; model: string; apiKey?: string }) {
+  return request<AiModelConfig>('/ai/model-config', { method: 'PUT', body: JSON.stringify(value) })
+}
+export function deleteAiModelConfig() { return request<AiModelConfig>('/ai/model-config', { method: 'DELETE' }) }
+
+export function listAiConversations() { return request<AiConversation[]>('/ai/conversations') }
+export function createAiConversation() { return request<AiConversation>('/ai/conversations', { method: 'POST', body: '{}' }) }
+export function getAiConversation(id: string) { return request<{ id: string; title: string; runs: AiRun[] }>(`/ai/conversations/${encodeURIComponent(id)}`) }
+export function sendAiMessage(id: string, text: string, clientMessageId: string = crypto.randomUUID()) {
+  return request<{ messageId: string; runId: string; status: AiRun['status']; eventsUrl: string }>(`/ai/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: JSON.stringify({ clientMessageId, content: [{ type: 'text', text }] }) })
+}
+export function getAiRun(id: string) { return request<AiRun>(`/ai/runs/${encodeURIComponent(id)}`) }
+export function regenerateAiMessage(messageId: string) { return request<{ conversationId: string; runId: string; messageId: string; eventsUrl: string }>(`/ai/messages/${encodeURIComponent(messageId)}/regenerate`, { method: 'POST', body: '{}' }) }
+export function cancelAiRun(id: string) { return request<AiRun>(`/ai/runs/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: '{}' }) }
+export function getAiDraft(id: string) { return request<{ id: string; name: string; tracks: TrackRef[]; version: number; status: string; publishedPlaylistId?: string }>(`/ai/playlist-drafts/${encodeURIComponent(id)}`) }
+export function updateAiDraft(id: string, name: string, sourceIds: string[], expectedVersion: number) {
+  return request<{ id: string; name: string; tracks: TrackRef[]; version: number; status: string }>(`/ai/playlist-drafts/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name, sourceIds, expectedVersion }) })
+}
+export function publishAiDraft(id: string, expectedVersion: number) {
+  return request<{ id: string; status: string; publishedPlaylistId?: string }>(`/ai/playlist-drafts/${encodeURIComponent(id)}/publish`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ expectedVersion }) })
+}
+export function aiEventsUrl(runId: string, after = 0) { return `${API_URL}/ai/runs/${encodeURIComponent(runId)}/events?after=${after}` }
 
 export async function getTmusicComments(provider: string, sourceId: string, signal?: AbortSignal): Promise<UiComment[]> {
   const data = await request<Array<Record<string, any>>>(`/comments?targetType=TRACK&provider=${encodeURIComponent(provider)}&targetId=${encodeURIComponent(sourceId)}`, { signal })
