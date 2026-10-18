@@ -11,7 +11,8 @@ import { usePlayerStore } from '../../stores/playerStore'
 
 export function AppShell() {
   const { pathname } = useLocation()
-  const showTopbar = pathname !== '/search' && pathname !== '/ai'
+  const lyricStageRoute = pathname === '/lyrics-stage'
+  const showTopbar = pathname !== '/search' && pathname !== '/ai' && !lyricStageRoute
   const roomRoute = pathname === '/room' || pathname.startsWith('/room/')
   const isPlaying = usePlayerStore((state) => state.isPlaying)
   const { data } = useQuery(queries.catalogHome())
@@ -20,7 +21,7 @@ export function AppShell() {
     if (data && !data.degraded) loadCatalogTracks(data.recommendations)
   }, [data, loadCatalogTracks])
   return (
-    <div className={`app-frame ${roomRoute ? 'room-route-shell' : ''} ${pathname === '/room' && !isPlaying ? 'room-lobby-shell' : ''}`}>
+    <div className={`app-frame ${roomRoute ? 'room-route-shell' : ''} ${pathname === '/room' && !isPlaying ? 'room-lobby-shell' : ''} ${lyricStageRoute ? 'lyrics-stage-shell' : ''}`}>
       <Sidebar />
       <main className="app-main">
         {showTopbar ? <PageTopbar /> : null}

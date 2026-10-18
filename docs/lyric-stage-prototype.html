@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TMusic · 沉浸歌词原型</title>
+  <style>
+    @font-face { font-family: "Smiley Sans"; src: url("./assets/SmileySans-Oblique.woff2") format("woff2"); font-display: swap; }
+    :root { color-scheme: dark; font-family: "Smiley Sans", "Noto Sans SC", sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050a12; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .back { position: fixed; z-index: 2; top: max(28px, env(safe-area-inset-top)); left: max(32px, env(safe-area-inset-left)); width: 52px; height: 52px; display: grid; place-items: center; padding: 0; border: 1px solid rgba(182,220,234,.24); border-radius: 50%; background: rgba(10,22,35,.42); color: #eafaff; box-shadow: 0 8px 32px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.1); backdrop-filter: blur(18px); cursor: pointer; transition: background .2s, transform .2s; }
+    .back:hover { background: rgba(42,180,210,.2); transform: translateX(-3px); }
+    .back:focus-visible { outline: 2px solid #80f0f0; outline-offset: 4px; }
+    .back svg { width: 23px; height: 23px; }
+    .fallback { display: none; position: fixed; inset: 0; place-items: center; padding: 80px 24px; color: #e9fbff; text-align: center; font: 700 clamp(32px, 6vw, 76px)/1.45 "Smiley Sans", "Noto Sans SC", sans-serif; text-shadow: 0 12px 35px #237d9c; background: radial-gradient(ellipse at 50% 48%, #14314a, #050a12 68%); }
+    @media (max-width: 600px) { .back { top: max(18px, env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); width: 46px; height: 46px; } }
+  </style>
+</head>
+<body>
+  <canvas id="stage" aria-label="沉浸式三维歌词动画"></canvas>
+  <div class="fallback" id="fallback">让声音，慢慢发光</div>
+  <button class="back" type="button" aria-label="返回上一页" title="返回上一页" onclick="history.length > 1 ? history.back() : location.replace('./13-immersive-lyrics-design-and-roadmap.md')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/><path d="M8 12h12"/></svg>
+  </button>
+  <script type="module">
+    // This is a visual prototype. Sample lines loop locally; no player or lyrics API is connected.
+    const lines = ['让声音，慢慢发光', '在夜色里与你相遇', '每一句都像星辰', '落进我们的时间'];
+    const canvas = document.querySelector('#stage');
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'high-performance' });
+    if (!gl) {
+      canvas.style.display = 'none';
+      document.querySelector('#fallback').style.display = 'grid';
+    } else {
+      const vertex = `#version 300 es
+        in vec2 a_position;
+        uniform vec4 u_rect;
+        uniform vec2 u_resolution;
+        uniform vec4 u_pose;
+        uniform float u_camera;
+        uniform float u_zoom;
+        out vec2 v_uv;
+        void main() {
+          vec2 local = (a_position - .5) * u_rect.zw;
+          float x = local.x * cos(u_pose.w);
+          float z = u_pose.z - local.x * sin(u_pose.w);
+          float perspective = 950.0 / (950.0 + max(z, -650.0));
+          vec2 p = u_rect.xy + .5 * u_rect.zw + vec2(x, local.y) * perspective + u_pose.xy;
+          p.x += u_camera * (1.0 + z / 1500.0);
+          p = .5 * u_resolution + (p - .5 * u_resolution) * u_zoom;
+          gl_Position = vec4(p.x / u_resolution.x * 2.0 - 1.0, 1.0 - p.y / u_resolution.y * 2.0, 0.0, 1.0);
+          v_uv = vec2(a_position.x, 1.0 - a_position.y);
+        }`;
+      const background = `#version 300 es
+        precision highp float;
+        in vec2 v_uv;
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        uniform float u_camera;
+        uniform float u_zoom;
+        out vec4 outColor;
+        void main() {
+          vec2 p = (gl_FragCoord.xy - .5 * u_resolution + vec2(u_camera * .8, 0.0)) / min(u_resolution.x, u_resolution.y) / u_zoom;
+          float t = u_time * .00013;
+          vec3 c = mix(vec3(.016,.032,.051), vec3(.025,.038,.069), v_uv.y);
+          float plum = exp(-dot((p - vec2(-.33 + .08*sin(t), .05))*vec2(1.3,1.0), (p - vec2(-.33 + .08*sin(t), .05))*vec2(1.3,1.0)) * 4.0);
+          float blue = exp(-dot((p - vec2(.45 + .07*cos(t*.8), -.18))*vec2(1.1,1.4), (p - vec2(.45 + .07*cos(t*.8), -.18))*vec2(1.1,1.4)) * 4.5);
+          float halo = exp(-length(p * vec2(1.0,1.35)) * 3.1);
+          c += vec3(.012,.13,.15) * plum + vec3(.055,.075,.20) * blue + vec3(.025,.065,.095) * halo;
+          float ring = exp(-pow((length(p * vec2(1.0,1.26)) - .43) * 18.0, 2.0)) * .07;
+          c += vec3(.22,.75,.84) * ring;
+          vec2 dust = p * vec2(18.0, 12.0) + vec2(t * 1.8, t * .7);
+          vec2 cell = floor(dust);
+          vec2 dotPos = fract(dust) - .5;
+          float random = fract(sin(dot(cell, vec2(23.17, 91.73))) * 35273.34);
+          float spark = (1.0 - smoothstep(.0, .035, length(dotPos))) * step(.978, random);
+          c += vec3(.22,.49,.58) * spark;
+          float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453) * .012;
+          outColor = vec4(c + grain, 1.0);
+        }`;
+      const lettering = `#version 300 es
+        precision highp float;
+        in vec2 v_uv;
+        uniform sampler2D u_glyph;
+        uniform vec2 u_texel;
+        uniform float u_opacity;
+        uniform float u_progress;
+        uniform float u_active;
+        out vec4 outColor;
+        void main() {
+          float face = texture(u_glyph, v_uv).a;
+          float depth = 0.0;
+          for (int i = 1; i <= 16; i++) {
+            vec2 shift = vec2(float(i) * u_texel.x * 1.35, -float(i) * u_texel.y * 1.45);
+            depth = max(depth, texture(u_glyph, v_uv - shift).a * (1.0 - float(i) * .035));
+          }
+          float x = v_uv.x;
+          float sweep = 1.0 - smoothstep(u_progress - .045, u_progress + .04, x);
+          vec3 bright = mix(vec3(.75,1.0,.96), vec3(.68,.78,1.0), smoothstep(.1,.9,x));
+          vec3 lit = mix(vec3(.53,.65,.72), bright, sweep);
+          float bevel = max(face - texture(u_glyph, v_uv + vec2(2.0 * u_texel.x, -2.0 * u_texel.y)).a, 0.0);
+          vec3 color = lit + bevel * vec3(.24,.29,.30);
+          float alpha = max(face, depth * .9) * u_opacity;
+          vec3 finalColor = mix(vec3(.075,.25,.38), color, face);
+          outColor = vec4(finalColor * alpha, alpha);
+        }`;
+      function compile(type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+        return shader;
+      }
+      function program(fragment) {
+        const result = gl.createProgram();
+        gl.attachShader(result, compile(gl.VERTEX_SHADER, vertex));
+        gl.attachShader(result, compile(gl.FRAGMENT_SHADER, fragment));
+        gl.linkProgram(result);
+        if (!gl.getProgramParameter(result, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(result));
+        return result;
+      }
+      const bgProgram = program(background);
+      const lyricProgram = program(lettering);
+      const quad = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 0,1, 1,0, 1,1]), gl.STATIC_DRAW);
+      function use(prog) {
+        gl.useProgram(prog);
+        gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+        const position = gl.getAttribLocation(prog, 'a_position');
+        gl.enableVertexAttribArray(position);
+        gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+      }
+      await document.fonts.load('120px "Smiley Sans"');
+      const textures = lines.map((text) => {
+        const surface = document.createElement('canvas');
+        const context = surface.getContext('2d');
+        context.font = '120px "Smiley Sans", "Noto Sans SC", sans-serif';
+        context.letterSpacing = '8px';
+        surface.width = Math.ceil(context.measureText(text).width + 160);
+        surface.height = 240;
+        context.font = '120px "Smiley Sans", "Noto Sans SC", sans-serif';
+        context.letterSpacing = '8px';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillStyle = '#fff';
+        context.fillText(text, surface.width / 2, surface.height / 2);
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, surface);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        return { texture, width: surface.width, height: surface.height };
+      });
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+      const preview = new URLSearchParams(location.search).get('preview');
+      function resize() {
+        const dpr = Math.min(devicePixelRatio || 1, 2);
+        canvas.width = Math.round(innerWidth * dpr);
+        canvas.height = Math.round(innerHeight * dpr);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+      addEventListener('resize', resize);
+      resize();
+      function drawLine(index, y, size, opacity, progress, pose, camera, zoom) {
+        const item = textures[(index + textures.length) % textures.length];
+        const scale = Math.min(size / 120, canvas.width * .86 / item.width);
+        const width = item.width * scale;
+        const height = item.height * scale;
+        gl.bindTexture(gl.TEXTURE_2D, item.texture);
+        gl.uniform4f(gl.getUniformLocation(lyricProgram, 'u_rect'), (canvas.width - width) / 2, y - height / 2, width, height);
+        gl.uniform4f(gl.getUniformLocation(lyricProgram, 'u_pose'), ...pose);
+        gl.uniform1f(gl.getUniformLocation(lyricProgram, 'u_camera'), camera);
+        gl.uniform1f(gl.getUniformLocation(lyricProgram, 'u_zoom'), zoom);
+        gl.uniform2f(gl.getUniformLocation(lyricProgram, 'u_texel'), 1 / item.width, 1 / item.height);
+        gl.uniform1f(gl.getUniformLocation(lyricProgram, 'u_opacity'), opacity);
+        gl.uniform1f(gl.getUniformLocation(lyricProgram, 'u_progress'), progress);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+      const ease = (x) => { const n = Math.max(0, Math.min(1, x)); return n * n * (3 - 2 * n); };
+      const started = performance.now();
+      function frame(now) {
+        const w = canvas.width;
+        const h = canvas.height;
+        gl.disable(gl.BLEND);
+        use(bgProgram);
+        gl.uniform2f(gl.getUniformLocation(bgProgram, 'u_resolution'), w, h);
+        gl.uniform4f(gl.getUniformLocation(bgProgram, 'u_rect'), 0, 0, w, h);
+        gl.uniform4f(gl.getUniformLocation(bgProgram, 'u_pose'), 0, 0, 0, 0);
+        gl.uniform1f(gl.getUniformLocation(bgProgram, 'u_time'), reduced.matches ? 0 : now);
+        const cycle = reduced.matches ? .45 : preview === 'transition' ? .91 : preview !== null ? .45 : (now - started) / 4700;
+        const unit = w / innerWidth;
+        const camera = reduced.matches ? 0 : Math.cos(cycle * Math.PI) * 76 * unit;
+        const zoom = reduced.matches ? 1 : 1 + Math.pow(Math.sin(cycle * Math.PI), 2) * .065;
+        gl.uniform1f(gl.getUniformLocation(bgProgram, 'u_camera'), camera);
+        gl.uniform1f(gl.getUniformLocation(bgProgram, 'u_zoom'), zoom);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        const index = Math.floor(cycle) % lines.length;
+        const phase = cycle % 1;
+        const exit = ease((phase - .67) / .17);
+        const arrival = ease((phase - .76) / .24);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        use(lyricProgram);
+        gl.uniform2f(gl.getUniformLocation(lyricProgram, 'u_resolution'), w, h);
+        gl.uniform1i(gl.getUniformLocation(lyricProgram, 'u_glyph'), 0);
+        const narrow = innerWidth < 650;
+        const size = (narrow ? 63 : 104) * unit;
+        drawLine(index, h * .5, size, 1 - exit, Math.min(1, phase * 1.4), [-260 * exit * unit, -35 * exit * unit, 520 * exit * unit, -.72 * exit], camera * .18, zoom);
+        if (arrival > 0) drawLine(index + 1, h * .5, size, arrival, arrival * .1, [420 * (1 - arrival) * unit, 55 * (1 - arrival) * unit, 780 * (1 - arrival) * unit, .95 * (1 - arrival)], camera * .18, zoom);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+  </script>
+</body>
+</html>

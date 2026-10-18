@@ -1,5 +1,5 @@
 import { Clock3, Heart, Home, Library, Music2, RadioTower, Search, Sparkles } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { queries } from '../../lib/queries'
 
@@ -13,10 +13,11 @@ const navItems = [
 ]
 
 export function Sidebar() {
+  const location = useLocation()
   const { data: account } = useQuery(queries.accountStatus())
   return (
     <aside className="sidebar" aria-label="主导航">
-      <NavLink to="/discover" className="brand-mark" aria-label="TMusic 首页">
+      <NavLink to="/lyrics-stage" state={{ from: `${location.pathname}${location.search}` }} className="brand-mark" aria-label="打开沉浸歌词" title="沉浸歌词">
         <span className="brand-ring" />
         <span className="brand-star">✦</span>
       </NavLink>

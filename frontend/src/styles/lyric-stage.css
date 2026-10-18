@@ -1,0 +1,23 @@
+@font-face {
+  font-family: 'Smiley Sans';
+  src: url('/fonts/SmileySans-Oblique.woff2') format('woff2');
+  font-display: swap;
+}
+
+.lyrics-stage-shell { height: 100svh; overflow: hidden; background: #050a12; }
+.lyrics-stage-shell .app-main { padding-left: 0; }
+.lyrics-stage-shell .sidebar,
+.lyrics-stage-shell .floating-player-card,
+.lyrics-stage-shell .queue-drawer-backdrop { visibility: hidden !important; pointer-events: none !important; }
+
+.lyric-stage { position: fixed; z-index: 50; inset: 0; overflow: hidden; background: #050a12; }
+.lyric-stage-canvas { display: block; width: 100%; height: 100%; }
+.lyric-stage-back { position: absolute; z-index: 1; top: max(28px, env(safe-area-inset-top)); left: max(32px, env(safe-area-inset-left)); width: 52px; height: 52px; display: grid; place-items: center; padding: 0; border: 1px solid rgba(182,220,234,.24); border-radius: 50%; background: rgba(10,22,35,.42); color: #eafaff; box-shadow: 0 8px 32px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.1); backdrop-filter: blur(18px); cursor: pointer; transition: background .2s, transform .2s; }
+.lyric-stage-back:hover { background: rgba(42,180,210,.2); transform: translateX(-3px); }
+.lyric-stage-back:focus-visible { outline: 2px solid #80f0f0; outline-offset: 4px; }
+.lyric-stage-message { position: absolute; inset: 0; display: grid; place-items: center; padding: 90px 24px; color: #d9f3f5; text-align: center; font: clamp(28px, 5vw, 62px)/1.4 'Smiley Sans', 'Noto Sans SC', sans-serif; text-shadow: 0 12px 35px rgba(35,125,156,.4); pointer-events: none; }
+.lyric-stage-screenreader { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 600px) {
+  .lyric-stage-back { top: max(18px, env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); width: 46px; height: 46px; }
+}
