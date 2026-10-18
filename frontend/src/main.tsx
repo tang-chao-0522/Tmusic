@@ -10,6 +10,7 @@ import './styles/immersive.css'
 import './styles/room.css'
 import './styles/favorites.css'
 import './styles/floating-player.css'
+import './styles/lyric-stage.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

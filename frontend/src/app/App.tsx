@@ -7,6 +7,7 @@ import { SearchPage } from '../pages/SearchPage'
 import { LibraryPage } from '../pages/LibraryPage'
 import { PlayerPage } from '../pages/PlayerPage'
 import { AccountPage } from '../pages/AccountPage'
+import { LyricsStagePage } from '../pages/LyricsStagePage'
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/library" element={<LibraryPage />} />
         <Route path="/player" element={<PlayerPage />} />
+        <Route path="/lyrics-stage" element={<LyricsStagePage />} />
         <Route path="/room" element={null} />
         <Route path="/room/:roomId" element={null} />
         <Route path="/ai" element={<AiPage />} />
