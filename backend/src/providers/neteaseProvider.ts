@@ -76,6 +76,10 @@ export class NeteaseProvider implements MusicProvider {
 
   async getPlaylistTracks(playlistId: string, serializedCookie: string) {
     const context = await this.authenticatedContext(serializedCookie)
+    return this.loadPlaylistTracks(playlistId, context)
+  }
+
+  private async loadPlaylistTracks(playlistId: string, context?: ProviderContext) {
     const payload = await this.json<{ code?: number; playlist?: Record<string, any> }>(`/playlist/detail?id=${playlistId}`, context)
     if (payload.code !== 200 || !payload.playlist) throw new Error(`Netease playlist detail returned code ${payload.code}`)
     const playlist = payload.playlist
@@ -88,7 +92,30 @@ export class NeteaseProvider implements MusicProvider {
       const byId = new Map((detail.songs ?? []).map((song) => [String(song.id), this.normalizeTrack(song)]))
       tracks.push(...chunk.flatMap((id) => { const track = byId.get(id); return track ? [track] : [] }))
     }
-    return { playlist: this.normalizePlaylist(playlist, Number(context.userId)), tracks }
+    return { playlist: this.normalizePlaylist(playlist, context?.userId ? Number(context.userId) : undefined), tracks }
+  }
+
+  async getCatalogTracks(type: Exclude<CatalogSearchType, 'song'>, id: string, serializedCookie?: string) {
+    const context = serializedCookie ? { userId: '', serializedCookie } : undefined
+    if (type === 'playlist') {
+      const { playlist, tracks } = await this.loadPlaylistTracks(id, context)
+      return { item: playlist, tracks }
+    }
+    if (type === 'album') {
+      const payload = await this.json<{ code?: number; album?: Record<string, any>; songs?: Array<Record<string, any>> }>(`/album?id=${id}`, context)
+      if (payload.code !== 200 || !payload.album) throw new Error(`Netease album returned code ${payload.code}`)
+      return { item: this.normalizeAlbum(payload.album), tracks: (payload.songs ?? []).map((song) => this.normalizeTrack(song)) }
+    }
+    const payload = await this.json<{ code?: number; artist?: Record<string, any> }>(`/artists?id=${id}`, context)
+    if (payload.code !== 200 || !payload.artist) throw new Error(`Netease artist returned code ${payload.code}`)
+    const tracks: TrackRef[] = []
+    for (let offset = 0; ; offset += 500) {
+      const page = await this.json<{ code?: number; songs?: Array<Record<string, any>>; more?: boolean }>(`/artist/songs?id=${id}&limit=500&offset=${offset}`, context)
+      if (page.code !== 200) throw new Error(`Netease artist songs returned code ${page.code}`)
+      tracks.push(...(page.songs ?? []).map((song) => this.normalizeTrack(song)))
+      if (!page.more || !page.songs?.length) break
+    }
+    return { item: this.normalizeArtist(payload.artist), tracks }
   }
 
   async health() {

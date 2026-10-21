@@ -159,6 +159,11 @@ export async function searchCatalog(query: string, type: SearchType = 'song', of
   }
 }
 
+export async function getCatalogTracks(type: Exclude<SearchType, 'song'>, id: string, signal?: AbortSignal) {
+  const data = await request<{ item: PlaylistSummary | AlbumSummary | ArtistSummary; tracks: TrackRef[] }>(`/catalog/${type}/${encodeURIComponent(id)}/tracks`, { signal })
+  return { ...data, tracks: data.tracks.map(toUiTrack) }
+}
+
 export async function getNeteaseLibrary(type: LibraryType, signal?: AbortSignal) {
   const data = await request<{ type: LibraryType; items: CatalogItem[] }>(`/me/library?type=${type}`, { signal })
   return {

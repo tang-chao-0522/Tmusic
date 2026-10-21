@@ -97,6 +97,18 @@ export const catalogRoutes: FastifyPluginAsync<{ provider: NeteaseProvider }> = 
     }
   })
 
+  app.get('/catalog/:type/:id/tracks', async (request, reply) => {
+    const { type, id } = request.params as { type: string; id: string }
+    if (!['playlist', 'album', 'artist'].includes(type) || !numericId(id)) return fail(reply, request, 422, 'VALIDATION_ERROR', '音乐内容无效')
+    try {
+      const cookie = await credential(request)
+      return ok(request, await options.provider.getCatalogTracks(type as 'playlist' | 'album' | 'artist', id, cookie ?? undefined))
+    } catch (error) {
+      request.log.warn({ err: error, type, id }, 'Netease catalog detail unavailable')
+      return fail(reply, request, 502, 'NETEASE_CATALOG_UNAVAILABLE', '暂时无法读取歌曲列表', true)
+    }
+  })
+
   app.get('/me/library', async (request, reply) => {
     const query = request.query as { type?: string; offset?: string; limit?: string }
     const type = query.type ?? 'playlist'

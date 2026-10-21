@@ -39,6 +39,7 @@ export async function api<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DEL
 
 export const catalogHome = () => api<HomeData>('/catalog/home')
 export const search = (q: string, type: 'song' | 'playlist' | 'artist' | 'album' = 'song') => api<{ items: Array<TrackRef | Playlist | Artist | Album>; degraded: boolean }>(`/catalog/search?q=${encodeURIComponent(q)}&type=${type}&limit=30`)
+export const catalogTracks = (type: 'playlist' | 'artist' | 'album', id: string) => api<{ item: Playlist | Artist | Album; tracks: TrackRef[] }>(`/catalog/${type}/${encodeURIComponent(id)}/tracks`)
 export const library = (type: LibraryKind) => api<{ items: Array<TrackRef | Playlist | Artist | Album> }>(`/me/library?type=${type}`)
 export async function likedTracksPage(offset = 0, limit = 24) {
   const { data, meta } = await apiEnvelope<{ items: TrackRef[] }>(`/me/library?type=liked&offset=${offset}&limit=${limit}`)

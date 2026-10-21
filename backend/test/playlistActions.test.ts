@@ -28,6 +28,31 @@ test('playlist detail uses full track IDs in order and writes only to owned play
   } finally { globalThis.fetch = originalFetch }
 })
 
+test('catalog details return playlist, album and artist tracks without requiring login', async () => {
+  const originalFetch = globalThis.fetch
+  const paths: string[] = []
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    paths.push(url.pathname)
+    if (url.pathname === '/playlist/detail') return Response.json({ code: 200, playlist: { id: 10, name: 'List', trackIds: [{ id: 2 }, { id: 1 }] } })
+    if (url.pathname === '/song/detail') return Response.json({ code: 200, songs: [{ id: 1, name: 'One' }, { id: 2, name: 'Two' }] })
+    if (url.pathname === '/album') return Response.json({ code: 200, album: { id: 20, name: 'Album' }, songs: [{ id: 3, name: 'Three' }] })
+    if (url.pathname === '/artists') return Response.json({ code: 200, artist: { id: 30, name: 'Artist' } })
+    if (url.pathname === '/artist/songs') return Response.json({ code: 200, songs: [{ id: 4, name: 'Four' }], more: false })
+    throw new Error(`Unexpected request: ${url.pathname}`)
+  }
+  try {
+    const provider = new NeteaseProvider()
+    const playlist = await provider.getCatalogTracks('playlist', '10')
+    const album = await provider.getCatalogTracks('album', '20')
+    const artist = await provider.getCatalogTracks('artist', '30')
+    assert.deepEqual(playlist.tracks.map((track) => track.sourceId), ['2', '1'])
+    assert.deepEqual(album.tracks.map((track) => track.sourceId), ['3'])
+    assert.deepEqual(artist.tracks.map((track) => track.sourceId), ['4'])
+    assert.equal(paths.includes('/login/status'), false)
+  } finally { globalThis.fetch = originalFetch }
+})
+
 test('heart requests pass the selected state to the Netease API', async () => {
   const originalFetch = globalThis.fetch
   const likes: string[] = []
