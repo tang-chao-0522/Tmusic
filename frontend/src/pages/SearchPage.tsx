@@ -25,12 +25,15 @@ export function SearchPage() {
   const [keyword, setKeyword] = useState(initialKeyword)
   const [type, setType] = useState<SearchType>('song')
   const [history, setHistory] = useState(readHistory)
+  const [selected, setSelected] = useState<{ type: Exclude<SearchType, 'song'>; id: string } | null>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const play = usePlayerStore((state) => state.play)
+  const playerQueue = usePlayerStore((state) => state.playQueue)
 
   useEffect(() => { const timer = window.setTimeout(() => setKeyword(query.trim()), 350); return () => window.clearTimeout(timer) }, [query])
   const search = useInfiniteQuery({ ...queries.search(keyword, type), enabled: keyword.length > 0 })
   const trending = useQuery({ ...queries.catalogHome(), enabled: keyword.length === 0 })
+  const detail = useQuery({ ...queries.catalogTracks(selected?.type ?? 'playlist', selected?.id ?? ''), enabled: Boolean(selected) })
   const items = keyword ? search.data?.pages.flatMap((page) => page.items) ?? [] : type === 'song' ? trending.data?.recommendations ?? [] : []
   const tracks = type === 'song' ? items as DemoTrack[] : []
   const isLoading = keyword ? search.isPending : trending.isPending
@@ -38,7 +41,7 @@ export function SearchPage() {
   const rowVirtualizer = useVirtualizer({ count: tracks.length + (keyword && tracks.length ? 1 : 0), getScrollElement: () => scrollerRef.current, estimateSize: () => 60, overscan: 6 })
   const virtualRows = rowVirtualizer.getVirtualItems()
 
-  useEffect(() => { scrollerRef.current?.scrollTo({ top: 0 }) }, [keyword, type])
+  useEffect(() => { setSelected(null); scrollerRef.current?.scrollTo({ top: 0 }) }, [keyword, type])
   useEffect(() => { const last = virtualRows.at(-1); if (type === 'song' && keyword && last && last.index >= tracks.length - 5 && search.hasNextPage && !search.isFetching) void search.fetchNextPage() }, [type, keyword, virtualRows, tracks.length, search.hasNextPage, search.isFetching, search.fetchNextPage])
 
   function commit(value: string) {
@@ -54,36 +57,52 @@ export function SearchPage() {
   }
   const selectedLabel = types.find((item) => item.value === type)?.label ?? '结果'
 
-  return <div className="immersive-page search-page-v2 page-with-player">
+  const detailLabel = selected ? types.find((entry) => entry.value === selected.type)?.label ?? '音乐' : ''
+  const detailItem = detail.data?.item
+  const detailSubtitle = selected?.type === 'playlist' ? (detailItem as PlaylistSummary | undefined)?.creatorName ?? '网易云音乐' : selected?.type === 'album' ? (detailItem as AlbumSummary | undefined)?.artistName ?? '' : `${(detailItem as ArtistSummary | undefined)?.albumCount ?? 0} 张专辑`
+
+  return <div className={`immersive-page search-page-v2 page-with-player ${selected ? 'search-detail-mode' : ''}`}>
     <div className="ambient-petals" />
-    <section className="search-intro">
+    {!selected && <section className="search-intro">
       <p>用声音，<br />再次遇见那时的天空。</p><h1>找到你喜欢的声音。</h1>
       <form className="giant-search glass-panel" onSubmit={(event) => { event.preventDefault(); commit(query) }}>
         <Search size={29} /><Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`搜索网易云${selectedLabel}…`} aria-label={`搜索网易云${selectedLabel}`} />
         {query ? <button type="button" onClick={() => { setQuery(''); setKeyword('') }} aria-label="清空搜索"><X /></button> : null}<button type="submit" aria-label="搜索">→</button>
       </form>
       <div className="search-chips" aria-label="搜索分类">{types.map(({ value, label, icon: Icon }) => <button type="button" key={value} className={type === value ? 'active' : ''} onClick={() => setType(value)}><Icon size={15} />{label}</button>)}</div>
-    </section>
+    </section>}
     <section className="search-board">
-      <GlassPanel as="aside" className="recent-searches">
+      {!selected && <GlassPanel as="aside" className="recent-searches">
         <header><h2>最近搜索</h2><button type="button" onClick={() => { setHistory([]); localStorage.removeItem(historyKey) }}>全部清除</button></header>
         {history.length ? history.map((item) => <div key={item} className="history-row"><Clock3 size={18} /><button type="button" onClick={() => commit(item)}>{item}</button><button type="button" aria-label={`删除 ${item}`} onClick={() => { const next = history.filter((entry) => entry !== item); setHistory(next); localStorage.setItem(historyKey, JSON.stringify(next)) }}><X size={15} /></button></div>) : <p className="search-hint">搜索过的内容会出现在这里</p>}
-      </GlassPanel>
+      </GlassPanel>}
       <GlassPanel className="result-panel">
-        <div className="result-tabs"><strong>{keyword ? `“${keyword}” 的${selectedLabel}` : type === 'song' ? '网易云新歌' : `输入关键词搜索${selectedLabel}`}</strong><span>{isLoading ? '搜索中…' : error && !items.length ? '连接失败' : keyword ? `已加载 ${items.length} / ${search.data?.pages[0]?.total ?? 0}` : `${items.length} 首歌曲`}</span></div>
+        {selected ? <header className="catalog-detail-header">
+          <button className="catalog-detail-back" type="button" onClick={() => setSelected(null)}>← 返回搜索结果</button>
+          <div className="catalog-detail-hero">
+            <div className={`catalog-detail-cover ${selected.type === 'artist' ? 'round' : ''}`}>{detailItem?.coverUrl ? <img src={detailItem.coverUrl} alt="" /> : <span>♫</span>}</div>
+            <div className="catalog-detail-info"><span className="catalog-detail-kind">{detailLabel}</span><h2>{detailItem?.name ?? '正在加载…'}</h2>{detailItem && <p>{detailSubtitle}</p>}<small>{detail.isPending ? '正在读取歌曲…' : `${detail.data?.tracks.length ?? 0} 首歌曲`}</small></div>
+            {detail.data?.tracks.length ? <button className="catalog-play-all" type="button" onClick={() => playerQueue(detail.data!.tracks, 0)}>▶ 播放全部</button> : null}
+          </div>
+        </header>
+          : <div className="result-tabs"><strong>{keyword ? `“${keyword}” 的${selectedLabel}` : type === 'song' ? '网易云新歌' : `输入关键词搜索${selectedLabel}`}</strong><span>{isLoading ? '搜索中…' : error && !items.length ? '连接失败' : keyword ? `已加载 ${items.length} / ${search.data?.pages[0]?.total ?? 0}` : `${items.length} 首歌曲`}</span></div>}
+        {selected ? <div className="result-scroller catalog-detail-list" aria-label={`${detail.data?.item.name ?? '内容'}歌曲列表`}>
+          {detail.isPending ? <div className="search-feedback">正在读取歌曲列表…</div> : detail.isError ? <div className="search-feedback" role="alert"><p>{detail.error.message}</p><button type="button" onClick={() => void detail.refetch()}>重试</button></div> : detail.data?.tracks.length ? detail.data.tracks.map((track, index) => <TrackListItem key={`${track.id}:${index}`} track={track} onPlay={() => playerQueue(detail.data!.tracks, index)} />) : <div className="search-feedback">暂无歌曲</div>}
+        </div> : <>
         {error && !items.length ? <div className="search-feedback" role="alert"><p>{error.message}</p><button type="button" onClick={() => keyword ? search.refetch() : trending.refetch()}>重试</button></div> : null}
         {!error && !isLoading && items.length === 0 ? <div className="search-feedback">{keyword ? `没有找到相关${selectedLabel}` : type === 'song' ? '网易云暂未返回歌曲' : `输入关键词后搜索${selectedLabel}`}</div> : null}
         <div className="result-scroller" ref={scrollerRef} aria-label={`${selectedLabel}搜索结果`} onScroll={loadMoreOnScroll}>
           {type === 'song' ? <div className="result-list" style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>{virtualRows.map((row) => { const track = tracks[row.index]; return track ? <TrackListItem key={`${track.id}:${row.index}`} track={track} style={{ position: 'absolute', top: 0, transform: `translateY(${row.start}px)` }} onPlay={() => { commit(query || track.name); play(track) }} /> : <div className="result-load-state" key="load-state" style={{ transform: `translateY(${row.start}px)` }}>{search.isFetchNextPageError ? <button type="button" onClick={() => void search.fetchNextPage()}>加载失败，点击重试</button> : search.hasNextPage ? '正在加载更多…' : '已经到底了'}</div> })}</div>
-            : <div className="catalog-result-grid">{items.map((item) => <CatalogResultCard key={(item as PlaylistSummary | AlbumSummary | ArtistSummary).id} type={type} item={item as PlaylistSummary | AlbumSummary | ArtistSummary} />)}{search.isFetchingNextPage ? <div className="catalog-scroll-status"><i /><i /><i /><span>正在加载更多{selectedLabel}</span></div> : null}{search.isFetchNextPageError ? <div className="catalog-scroll-status error">加载遇到问题，继续滚动即可重试</div> : null}</div>}
+            : <div className="catalog-result-grid">{items.map((item) => <CatalogResultCard key={(item as PlaylistSummary | AlbumSummary | ArtistSummary).id} type={type} item={item as PlaylistSummary | AlbumSummary | ArtistSummary} onClick={() => setSelected({ type, id: (item as PlaylistSummary | AlbumSummary | ArtistSummary).id })} />)}{search.isFetchingNextPage ? <div className="catalog-scroll-status"><i /><i /><i /><span>正在加载更多{selectedLabel}</span></div> : null}{search.isFetchNextPageError ? <div className="catalog-scroll-status error">加载遇到问题，继续滚动即可重试</div> : null}</div>}
         </div>
+        </>}
       </GlassPanel>
     </section>
   </div>
 }
 
-function CatalogResultCard({ type, item }: { type: Exclude<SearchType, 'song'>; item: PlaylistSummary | AlbumSummary | ArtistSummary }) {
+function CatalogResultCard({ type, item, onClick }: { type: Exclude<SearchType, 'song'>; item: PlaylistSummary | AlbumSummary | ArtistSummary; onClick: () => void }) {
   const isPlaylist = type === 'playlist', isAlbum = type === 'album'
   const subtitle = isPlaylist ? `${(item as PlaylistSummary).trackCount} 首 · ${(item as PlaylistSummary).creatorName ?? '网易云音乐'}` : isAlbum ? (item as AlbumSummary).artistName : `${(item as ArtistSummary).musicCount} 首歌曲 · ${(item as ArtistSummary).albumCount} 张专辑`
-  return <article className={`catalog-result-card ${type === 'artist' ? 'round' : ''}`}><div>{item.coverUrl ? <img src={item.coverUrl} alt="" loading="lazy" /> : <span>{type === 'artist' ? '歌' : '♫'}</span>}</div><section><strong>{item.name}</strong><small>{subtitle}</small>{isPlaylist && (item as PlaylistSummary).description ? <p>{(item as PlaylistSummary).description}</p> : null}</section></article>
+  return <button type="button" className={`catalog-result-card ${type === 'artist' ? 'round' : ''}`} onClick={onClick}><div>{item.coverUrl ? <img src={item.coverUrl} alt="" loading="lazy" /> : <span>{type === 'artist' ? '歌' : '♫'}</span>}</div><section><strong>{item.name}</strong><small>{subtitle}</small>{isPlaylist && (item as PlaylistSummary).description ? <p>{(item as PlaylistSummary).description}</p> : null}</section></button>
 }

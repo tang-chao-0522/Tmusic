@@ -1,7 +1,7 @@
 import { infiniteQueryOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 import type { DemoTrack } from '../data/tracks'
 import {
-  getAccountOverview, getCatalogHome, getNeteaseComments, getNeteaseLibrary, getLikedIds, getPlaylistTracks,
+  getAccountOverview, getCatalogHome, getCatalogTracks, getNeteaseComments, getNeteaseLibrary, getLikedIds, getPlaylistTracks,
   getNeteaseLoginStatus, getRecentTracks, getLikedTracksPage, getTmusicComments, getTrackLyrics,
   resolvePlayback, searchCatalog, type LibraryType, type PlaybackGrant, type SearchType,
 } from './api'
@@ -11,6 +11,7 @@ const minute = 60_000
 export const queryKeys = {
   catalogHome: ['catalog-home'] as const,
   search: (keyword: string, type: SearchType) => ['catalog-search', keyword, type] as const,
+  catalogTracks: (type: Exclude<SearchType, 'song'>, id: string) => ['catalog-tracks', type, id] as const,
   accountStatus: ['netease-login-status'] as const,
   accountOverviewRoot: ['netease-account-overview'] as const,
   accountOverview: (userId: number) => ['netease-account-overview', userId] as const,
@@ -36,6 +37,7 @@ export const queries = {
     initialPageParam: 0, getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
     staleTime: 5 * minute, gcTime: 30 * minute,
   }),
+  catalogTracks: (type: Exclude<SearchType, 'song'>, id: string) => queryOptions({ queryKey: queryKeys.catalogTracks(type, id), queryFn: ({ signal }) => getCatalogTracks(type, id, signal), staleTime: 5 * minute }),
   accountStatus: () => queryOptions({ queryKey: queryKeys.accountStatus, queryFn: ({ signal }) => getNeteaseLoginStatus(signal), staleTime: 2 * minute, retry: false }),
   accountOverview: (userId: number) => queryOptions({ queryKey: queryKeys.accountOverview(userId), queryFn: ({ signal }) => getAccountOverview(signal), staleTime: 2 * minute, retry: false }),
   library: (userId: number, type: LibraryType) => queryOptions({ queryKey: queryKeys.library(userId, type), queryFn: ({ signal }) => getNeteaseLibrary(type, signal), staleTime: 3 * minute, retry: false }),
