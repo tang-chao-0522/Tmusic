@@ -2,7 +2,11 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY . .
-RUN npm ci
+RUN npm ci \
+    --registry=https://registry.npmmirror.com \
+    --fetch-retries=5 \
+    --fetch-retry-mintimeout=20000 \
+    --fetch-retry-maxtimeout=120000
 
 # 前端使用同源接口，避免指向 localhost
 ENV VITE_API_URL=/api/v1
